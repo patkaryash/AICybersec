@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aicybersec"
+version = "0.1.0"
+description = "AI-assisted penetration-testing platform - agent foundation"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.2",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[project.scripts]
+aicybersec = "agent_core.__main__:main"
+
+[tool.setuptools]
+packages = [
+    "agent_core",
+    "agent_core.schemas",
+    "agent_core.providers",
+    "agent_core.planner",
+    "agent_core.tools",
+    "agent_core.safety",
+    "agent_core.runtime",
+    "agent_core.state",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]
