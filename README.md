@@ -5,10 +5,11 @@ repository currently contains the **agent foundation**: a modular,
 mock-first agent core that runs entirely offline, plus a minimal FastAPI
 backend exposing it over HTTP/SSE.
 
-> **Status:** foundation + three real tools (nmap, httpx, nuclei). No external
-> LLM, no exploitation, no browser automation, no model training yet. Mock
-> tools still work; real tools run as controlled subprocesses against
-> allowlisted targets only.
+> **Status:** foundation + three real tools (nmap, httpx, nuclei) + model
+> planner. No external LLM wired by default, no exploitation, no browser
+> automation, no model training yet. Mock tools and MockModelProvider still
+> work; real tools run as controlled subprocesses against allowlisted
+> targets only.
 
 ## Architecture (text diagram)
 
@@ -123,6 +124,26 @@ nuclei -version
 # Templates (out of band): nuclei -update-templates
 python -m agent_core --target demo.local --list-tools  # shows "nuclei"
 ```
+
+## ModelPlanner (M3-A - model decision layer)
+
+The model proposes; safety disposes. `ModelPlanner` implements the existing
+`Planner` interface, so `AgentRuntime` is unchanged:
+
+```
+structured state (goal, recent observations, findings, tool specs, scope)
+  → ModelProvider.generate() → raw JSON text (never trusted)
+  → parse_decision() → typed ToolCall | Finish (fail-closed)
+  → SafetyValidator → ToolRegistry → Tool
+```
+
+- The request is bounded (recent observations, capped data/strings) and
+  carries no raw scanner dumps, binaries, or shell syntax.
+- Malformed JSON, schema violations, and provider failures raise
+  `ModelPlannerError`; the runtime fails the run without executing anything.
+- Tests use `MockModelProvider` (queued deterministic responses). A minimal
+  stdlib-only `OpenAICompatibleProvider` exists for later wiring; no API key
+  or network is required for CI.
 
 ## Setup
 

@@ -117,6 +117,7 @@ Consequences of this discipline:
 | Nmap (M1, done) | `tools/nmap.py:NmapTool` + `tools/nmap_parser.py:parse_nmap_xml` + `tools/subprocess.py:run_pinned_binary` | `agent_core/__main__.py:build_default_registry` + `backend/deps.py:build_registry` | none (validator already extracts `target`) |
 | HTTPX (M2-A, done) | `tools/httpx.py:HTTPXTool` + `tools/httpx_parser.py:parse_httpx_jsonl` (reuse `run_pinned_binary`) | same two composition roots | tiny: validator `_extract_targets()` + `policy_targets()` hook so EVERY `targets[]` entry is allowlisted |
 | Nuclei (M2-B, done) | `tools/nuclei.py:NucleiTool` + `tools/nuclei_parser.py:parse_nuclei_jsonl` (reuse `run_pinned_binary`, same `policy_targets()` hook) | same two composition roots | none (M2-A hook reused; `danger_level=active_scan`) |
+| ModelPlanner (M3-A, done) | `planner/model.py:ModelPlanner` + `build_model_request()` over `providers/base.py:ModelProvider` (mock queued, stdlib OpenAI-compatible) | injected as `Planner` (tests/demos; composition root unchanged) | none (strict `parse_decision()`; validator/runtime untouched) |
 | Real model | class with `generate(ModelRequest) -> ModelResponse` | composition root + config | none |
 | Model-backed planner | `Planner.decide(state)` wrapping a provider | composition root | none |
 | Rate limiting | `safety.policy.check_extra` | inside policy module | none |
