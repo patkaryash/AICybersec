@@ -15,6 +15,9 @@ from agent_core.safety.policy import policy_from_env
 from agent_core.safety.validator import SafetyValidator
 from agent_core.state import JsonFileStore
 from agent_core.tools.mocks import MockPortScan, MockWebProbe
+from agent_core.tools.httpx import HTTPXTool
+from agent_core.tools.nmap import NmapTool
+from agent_core.tools.nuclei import NucleiTool
 from agent_core.tools.registry import ToolRegistry
 
 
@@ -23,6 +26,9 @@ def build_default_registry() -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(MockPortScan())
     registry.register(MockWebProbe())
+    registry.register(NmapTool())
+    registry.register(HTTPXTool())
+    registry.register(NucleiTool())
     return registry
 
 
