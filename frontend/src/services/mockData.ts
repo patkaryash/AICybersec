@@ -2,6 +2,8 @@ import { Scan } from '../types/scan';
 import { Finding } from '../types/finding';
 import { AgentTimelineEvent } from '../types/agent';
 
+export const SYNTHETIC_TOKEN = 'SYNTHETIC_TOKEN';
+
 export const INITIAL_FINDINGS: Finding[] = [
   {
     id: 'fnd-sqli-01',
@@ -194,7 +196,7 @@ export const INITIAL_FINDINGS: Finding[] = [
     status: 'open',
     detectedAt: '2026-09-23T11:24:08Z',
     evidence: {
-      request: 'GET /api/v2/invoices/INV-90422 HTTP/1.1\nHost: api.auth-portal.test\nAuthorization: Bearer test_token_user_a',
+      request: `GET /api/v2/invoices/INV-90422 HTTP/1.1\nHost: api.auth-portal.test\nAuthorization: Bearer ${SYNTHETIC_TOKEN}`,
       response: 'HTTP/1.1 200 OK\nContent-Type: application/json\n\n{"invoiceId": "INV-90422", "ownerId": "usr_other_tenant", "amount": "$14,500.00"}',
       matchedPattern: '"ownerId": "usr_other_tenant"',
     },

@@ -10,6 +10,11 @@ function getStoredFindings(): Finding[] {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_FINDINGS));
       return INITIAL_FINDINGS;
     }
+    if (raw.includes('test_token_user_a')) {
+      const migrated = raw.replace(/test_token_user_a/g, 'SYNTHETIC_TOKEN');
+      localStorage.setItem(STORAGE_KEY, migrated);
+      return JSON.parse(migrated);
+    }
     return JSON.parse(raw);
   } catch (e) {
     console.warn('Failed to parse findings from localStorage, falling back to defaults', e);
