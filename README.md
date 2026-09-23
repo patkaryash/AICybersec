@@ -145,6 +145,24 @@ structured state (goal, recent observations, findings, tool specs, scope)
   stdlib-only `OpenAICompatibleProvider` exists for later wiring; no API key
   or network is required for CI.
 
+## M3-B - deterministic end-to-end evaluation
+
+`tests/integration/test_autonomous_loop.py` proves the architecture runs a
+multi-step planner-driven workflow with `MockModelProvider` only:
+
+```
+ModelPlanner → SafetyValidator → nmap → Observation
+→ ModelPlanner → SafetyValidator → httpx → Observation
+→ ModelPlanner → SafetyValidator → nuclei → Observation
+→ ModelPlanner → Finish
+```
+
+No real LLM, no network, no binaries: model responses are queued FIFO and
+tool runners are mocked. Safety stays outside the model (an evil-target
+proposal is rejected, never executed), and the existing `max_steps` guard
+stops a planner that never finishes. This is an architecture evaluation,
+not an autonomous production deployment.
+
 ## Setup
 
 ```bash

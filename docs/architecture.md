@@ -118,6 +118,7 @@ Consequences of this discipline:
 | HTTPX (M2-A, done) | `tools/httpx.py:HTTPXTool` + `tools/httpx_parser.py:parse_httpx_jsonl` (reuse `run_pinned_binary`) | same two composition roots | tiny: validator `_extract_targets()` + `policy_targets()` hook so EVERY `targets[]` entry is allowlisted |
 | Nuclei (M2-B, done) | `tools/nuclei.py:NucleiTool` + `tools/nuclei_parser.py:parse_nuclei_jsonl` (reuse `run_pinned_binary`, same `policy_targets()` hook) | same two composition roots | none (M2-A hook reused; `danger_level=active_scan`) |
 | ModelPlanner (M3-A, done) | `planner/model.py:ModelPlanner` + `build_model_request()` over `providers/base.py:ModelProvider` (mock queued, stdlib OpenAI-compatible) | injected as `Planner` (tests/demos; composition root unchanged) | none (strict `parse_decision()`; validator/runtime untouched) |
+| Deterministic loop (M3-B, done) | `tests/integration/test_autonomous_loop.py`: ModelPlanner + MockModelProvider FIFO driving nmap → httpx → nuclei → Finish through the unchanged runtime | test-only, mocked runners | none (evaluation of the existing architecture) |
 | Real model | class with `generate(ModelRequest) -> ModelResponse` | composition root + config | none |
 | Model-backed planner | `Planner.decide(state)` wrapping a provider | composition root | none |
 | Rate limiting | `safety.policy.check_extra` | inside policy module | none |
