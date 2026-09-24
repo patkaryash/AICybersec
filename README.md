@@ -145,6 +145,29 @@ structured state (goal, recent observations, findings, tool specs, scope)
   stdlib-only `OpenAICompatibleProvider` exists for later wiring; no API key
   or network is required for CI.
 
+## M3-C - controlled real model integration
+
+M3-A's planner can now talk to a real OpenAI-compatible endpoint
+(Ollama, LM Studio, vLLM, or any `/chat/completions` server) through the
+unchanged `ModelProvider` interface. The model still only proposes;
+`SafetyValidator` still authorizes every call.
+
+```bash
+# Local server example (Ollama); keys stay in the environment, never in code.
+export AICYBERSEC_MODEL_PROVIDER=openai_compatible
+export AICYBERSEC_MODEL_BASE_URL=http://localhost:11434/v1
+export AICYBERSEC_MODEL_NAME=qwen2.5:14b
+export AICYBERSEC_MODEL_API_KEY=   # empty for local servers
+python -m agent_core --target demo.local --provider openai_compatible
+```
+
+- Selection is config-driven (`agent_core/providers/factory.py:build_provider`);
+  default remains mock/scripted, so tests and demos never need credentials.
+- Completions are capped (`AICYBERSEC_MODEL_MAX_RESPONSE_CHARS`, default 8000);
+  requests carry the same bounded, normalized context as M3-A.
+- `tests/integration/test_live_model.py` is the opt-in live smoke test
+  (`AICYBERSEC_LIVE_MODEL_TEST=1`); it is skipped in CI.
+
 ## M3-B - deterministic end-to-end evaluation
 
 `tests/integration/test_autonomous_loop.py` proves the architecture runs a
