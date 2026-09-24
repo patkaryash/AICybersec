@@ -12,6 +12,11 @@ dependencies = [
     "pydantic-settings>=2.2",
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.1",
+    "pwdlib[argon2]>=0.2",
+    "pyjwt>=2.8",
 ]
 
 [project.optional-dependencies]
@@ -30,6 +35,10 @@ packages = [
     "agent_core.safety",
     "agent_core.runtime",
     "agent_core.state",
+    "backend",
+    "backend.core",
+    "backend.db",
+    "backend.api",
 ]
 
 [tool.pytest.ini_options]

@@ -5,9 +5,11 @@ repository currently contains the **agent foundation**: a modular,
 mock-first agent core that runs entirely offline, plus a minimal FastAPI
 backend exposing it over HTTP/SSE.
 
-> **Status:** foundation only. No real security tools (nmap/httpx/nuclei/
-> ZAP), no external LLM, no exploitation, no browser automation, no
-> model training yet. Everything runs on mocks and scripted decisions.
+> **Status:** foundation + three real tools (nmap, httpx, nuclei) + model
+> planner. No external LLM wired by default, no exploitation, no browser
+> automation, no model training yet. Mock tools and MockModelProvider still
+> work; real tools run as controlled subprocesses against allowlisted
+> targets only.
 
 ## Architecture (text diagram)
 
@@ -48,7 +50,8 @@ agent_core/     Pure agent library. No FastAPI, no HTTP, no shell tool.
   schemas/      Shared contracts (Decision, ToolSpec, Finding, AgentState...)
   providers/    ModelProvider protocol + mock (future model plugs in here)
   planner/      Planner protocol + ScriptedPlanner (deterministic demo)
-  tools/        Tool ABC, ToolContext, ToolRegistry, mock tools
+  tools/        Tool ABC, ToolContext, ToolRegistry, mock tools,
+                subprocess.py (pinned-binary runner), nmap.py + nmap_parser.py
   safety/       Policy + two-stage SafetyValidator
   runtime/      AgentRuntime loop + event system
   state/        JsonFileStore (state.json + trajectory.jsonl)
@@ -58,6 +61,107 @@ tests/          unit / integration / contracts / api (all offline)
 docs/           architecture.md
 runs/           gitignored runtime output (state.json, trajectory.jsonl)
 ```
+
+## Nmap (M1 - first real tool)
+
+Authorized targets only. `nmap` is invoked as a controlled subprocess:
+
+- No `shell=True`, no raw command strings; target is a separate argv element.
+- Fixed argv per profile, XML stdout (`-oX -`) parsed with stdlib only.
+- `NmapParams{target, ports="top-1000", profile="safe"|"version"|"os"|"vuln"}`
+  (`ports` is `top-<n>` or `80,443`/`1-1024`; arbitrary flags rejected).
+- Reconnaissance only: no vulnerability Findings are manufactured.
+- Every call still passes `Decision -> SafetyValidator -> ToolRegistry`.
+
+Check/install Nmap locally (optional - tests never require it):
+
+```bash
+nmap --version
+# Windows: winget install Insecure.Nmap  |  Debian/Ubuntu: sudo apt install nmap
+python -m agent_core --target 127.0.0.1 --list-tools  # shows "nmap"
+```
+
+## HTTPX (M2-A - second real tool)
+
+Purpose: HTTP/service reconnaissance (status, title, server, tech, TLS).
+Authorized targets only, through the same controlled subprocess layer:
+
+- No `shell=True`, no raw command strings; each target is a separate
+  `-u <target>` argv value.
+- Fixed argv, JSONL stdout (`-json`) parsed per-line; only agent-relevant
+  fields retained (raw httpx JSON never enters model context).
+- `HTTPXParams{targets: list[str]}` (max 20, validated; arbitrary flags rejected).
+- `danger_level=safe`. Reconnaissance only: `findings=[]`.
+- EVERY target in `targets` must pass the allowlist before execution.
+
+Check/install HTTPX locally (optional - tests never require it):
+
+```bash
+httpx -version
+# Go: go install github.com/projectdiscovery/httpx/cmd/httpx@latest
+python -m agent_core --target demo.local --list-tools  # shows "httpx"
+```
+
+## Nuclei (M2-B - controlled vulnerability scanning)
+
+Purpose: template-based vulnerability checks against authorized targets.
+Same controlled subprocess layer, no arbitrary commands:
+
+- No `shell=True`, no raw command strings; each target is a separate
+  `-target <target>` argv value.
+- Fixed profile, JSONL stdout (`-jsonl`) parsed per-line into `Finding`
+  objects (`tool="nuclei"`); raw nuclei JSON never enters model context.
+- `NucleiParams{targets: list[str]}` (max 20, validated; arbitrary flags rejected).
+- `danger_level=active_scan`. EVERY target must pass the allowlist before
+  execution; empty output is a valid clean result (`findings=[]`).
+- Arbitrary command execution is not supported by design.
+
+Check/install Nuclei locally (optional - tests never require it):
+
+```bash
+nuclei -version
+# Go: go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+# Templates (out of band): nuclei -update-templates
+python -m agent_core --target demo.local --list-tools  # shows "nuclei"
+```
+
+## ModelPlanner (M3-A - model decision layer)
+
+The model proposes; safety disposes. `ModelPlanner` implements the existing
+`Planner` interface, so `AgentRuntime` is unchanged:
+
+```
+structured state (goal, recent observations, findings, tool specs, scope)
+  → ModelProvider.generate() → raw JSON text (never trusted)
+  → parse_decision() → typed ToolCall | Finish (fail-closed)
+  → SafetyValidator → ToolRegistry → Tool
+```
+
+- The request is bounded (recent observations, capped data/strings) and
+  carries no raw scanner dumps, binaries, or shell syntax.
+- Malformed JSON, schema violations, and provider failures raise
+  `ModelPlannerError`; the runtime fails the run without executing anything.
+- Tests use `MockModelProvider` (queued deterministic responses). A minimal
+  stdlib-only `OpenAICompatibleProvider` exists for later wiring; no API key
+  or network is required for CI.
+
+## M3-B - deterministic end-to-end evaluation
+
+`tests/integration/test_autonomous_loop.py` proves the architecture runs a
+multi-step planner-driven workflow with `MockModelProvider` only:
+
+```
+ModelPlanner → SafetyValidator → nmap → Observation
+→ ModelPlanner → SafetyValidator → httpx → Observation
+→ ModelPlanner → SafetyValidator → nuclei → Observation
+→ ModelPlanner → Finish
+```
+
+No real LLM, no network, no binaries: model responses are queued FIFO and
+tool runners are mocked. Safety stays outside the model (an evil-target
+proposal is rejected, never executed), and the existing `max_steps` guard
+stops a planner that never finishes. This is an architecture evaluation,
+not an autonomous production deployment.
 
 ## Setup
 

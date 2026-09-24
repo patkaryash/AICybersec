@@ -66,15 +66,18 @@ class SafetyValidator:
                 )
 
             # Target extraction is tool-driven: ask the tool which param
-            # identifies its target so policy stays schema-agnostic.
-            target = self._extract_target(tool, decision.params)
-            if not self.policy.target_allowed(target):
-                return ValidationOutcome(
-                    accepted=False,
-                    reason=(
-                        f"target {target!r} is not in the allowed targets list"
-                    ),
-                )
+            # identifies its target(s) so policy stays schema-agnostic.
+            # Single-target tools use `target`/`url` (or `policy_target`);
+            # multi-target tools (e.g. httpx `targets`) expose
+            # `policy_targets(params) -> list`. EVERY entry must be allowed.
+            for target in self._extract_targets(tool, decision.params):
+                if not self.policy.target_allowed(target):
+                    return ValidationOutcome(
+                        accepted=False,
+                        reason=(
+                            f"target {target!r} is not in the allowed targets list"
+                        ),
+                    )
 
             extra_reason = check_extra(self.policy, state)
             if extra_reason:
@@ -92,7 +95,9 @@ class SafetyValidator:
 
         Conventions: params key ``target`` or ``url``.  Kept tiny and
         documented - a future tool with different semantics can override
-        by exposing a ``policy_target(params)`` method.
+        by exposing a ``policy_target(params)`` method. Multi-target
+        tools should expose ``policy_targets(params)`` instead; see
+        ``_extract_targets``.
         """
         override = getattr(tool, "policy_target", None)
         if callable(override):
@@ -102,3 +107,16 @@ class SafetyValidator:
         if "url" in params:
             return str(params["url"])
         return None
+
+    @staticmethod
+    def _extract_targets(tool: Tool, params: dict[str, Any]) -> list[str | None]:
+        """All policy-relevant targets for a decision (each must be allowed)."""
+        plural = getattr(tool, "policy_targets", None)
+        if callable(plural):
+            result = plural(params)
+            if isinstance(result, list):
+                return [str(t) if t is not None else None for t in result]
+            return [str(result) if result is not None else None]
+        if "targets" in params and isinstance(params["targets"], list):
+            return [str(t) for t in params["targets"]]
+        return [SafetyValidator._extract_target(tool, params)]

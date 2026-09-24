@@ -1,0 +1,69 @@
+# AICybersec local/lab stack.
+#
+#   docker compose up -d postgres backend      # platform (postgres + API)
+#   docker compose --profile lab up -d         # + OWASP Juice Shop lab target
+#
+# NOTE: the initial deployment is a SINGLE backend process. The in-process
+# event hub, cancellation registry and scan semaphore are not
+# distributed-safe; a queue/worker is a documented future extension.
+# Containerization is a hardening layer, not a complete sandbox.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aicybersec
+      POSTGRES_PASSWORD: aicybersec
+      POSTGRES_DB: aicybersec
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aicybersec -d aicybersec"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    cpus: 1.0
+    mem_limit: 512m
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    environment:
+      AICYBERSEC_DATABASE_URL: postgresql+psycopg://aicybersec:aicybersec@postgres:5432/aicybersec
+      AICYBERSEC_JWT_SECRET: dev-insecure-jwt-secret-change-me
+      AICYBERSEC_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      AICYBERSEC_RUNS_DIR: /app/runs
+      AICYBERSEC_ADMIN_EMAIL: admin@aicybersec.local
+      AICYBERSEC_ADMIN_PASSWORD: admin-dev-password-change-me
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Migrations run before the app starts so the schema always matches.
+    command: ["sh", "-c", "alembic upgrade head && uvicorn backend.main:app --host 0.0.0.0 --port 8000"]
+    volumes:
+      - runs:/app/runs
+    cpus: 2.0
+    mem_limit: 1g
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  # Authorized, intentionally vulnerable lab target for development/E2E.
+  # Never point scans at arbitrary Internet targets.
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    profiles: ["lab"]
+    ports:
+      - "3000:3000"
+    cpus: 1.0
+    mem_limit: 512m
+
+volumes:
+  pgdata:
+  runs:
