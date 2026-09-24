@@ -15,7 +15,8 @@ import uuid
 from dataclasses import dataclass, field
 
 from agent_core.config import get_settings
-from agent_core.planner import ScriptedPlanner
+from agent_core.planner import ModelPlanner, ScriptedPlanner
+from agent_core.providers.factory import build_provider
 from agent_core.runtime import AgentRuntime, InMemorySink
 from agent_core.safety.policy import Policy, policy_from_env
 from agent_core.safety.validator import SafetyValidator
@@ -40,6 +41,25 @@ def build_registry() -> ToolRegistry:
 
 def build_policy(targets: list[str], mode: str) -> Policy:
     return policy_from_env(allowed_targets=targets, mode=mode)
+
+
+def build_planner(registry: ToolRegistry, targets: list[str]):
+    """Select the planner from agent_core settings (M3-C).
+
+    Default is the deterministic ScriptedPlanner, so the API runs
+    without an LLM exactly as before. Setting
+    AICYBERSEC_MODEL_PROVIDER=openai_compatible (plus base URL/model)
+    switches runs to ModelPlanner + the real provider. Either way the
+    planner only proposes Decisions; SafetyValidator authorizes them.
+    """
+    settings = get_settings()
+    if str(settings.model_provider or "mock").strip().lower() == "openai_compatible":
+        return ModelPlanner(
+            build_provider(settings), registry, allowed_targets=list(targets)
+        )
+    return ScriptedPlanner(
+        ScriptedPlanner.demo_script(targets[0] if targets else "demo.local")
+    )
 
 
 @dataclass
@@ -69,9 +89,7 @@ class RunManager:
         registry = build_registry()
         policy = build_policy(targets, mode)
         validator = SafetyValidator(registry, policy)
-        planner = ScriptedPlanner(
-            ScriptedPlanner.demo_script(targets[0] if targets else "demo.local")
-        )
+        planner = build_planner(registry, targets)
         sink = InMemorySink()
 
         runtime = AgentRuntime(

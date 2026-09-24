@@ -3,13 +3,18 @@
     python -m agent_core --target demo.local --list-tools
     python -m agent_core --target demo.local
     python -m agent_core --goal "..." --target demo.local --max-steps 6
+
+A real model backend is opt-in only (M3-C): --provider openai_compatible
+with AICYBERSEC_MODEL_BASE_URL / AICYBERSEC_MODEL_NAME set. Mock/scripted
+remains the default so the demo never needs credentials or network.
 """
 from __future__ import annotations
 
 import argparse
 import sys
 
-from agent_core.planner import ScriptedPlanner
+from agent_core.planner import ModelPlanner, ScriptedPlanner
+from agent_core.providers.factory import build_provider
 from agent_core.runtime import AgentRuntime, InMemorySink, PrinterSink
 from agent_core.safety.policy import policy_from_env
 from agent_core.safety.validator import SafetyValidator
@@ -32,12 +37,35 @@ def build_default_registry() -> ToolRegistry:
     return registry
 
 
+def build_planner(registry: ToolRegistry, target: str, provider_name: str | None = None):
+    """Select the planner from config (M3-C).
+
+    Default is the deterministic ScriptedPlanner (mock path, offline).
+    ``openai_compatible`` (env AICYBERSEC_MODEL_PROVIDER or --provider)
+    builds a real provider + ModelPlanner; endpoint credentials come
+    from the environment, never from code. SafetyValidator still owns
+    every authorization decision downstream.
+    """
+    from agent_core.config import get_settings
+
+    settings = get_settings()
+    if provider_name is not None:
+        settings = settings.model_copy(update={"model_provider": provider_name})
+    name = str(settings.model_provider or "mock").strip().lower()
+    if name == "openai_compatible":
+        provider = build_provider(settings)
+        print(f"  planner: ModelPlanner via {type(provider).__name__}")
+        return ModelPlanner(provider, registry, allowed_targets=[target])
+    return ScriptedPlanner(ScriptedPlanner.demo_script(target))
+
+
 def run_demo(
     goal: str,
     target: str,
     runs_dir: str,
     max_steps: int,
     sinks: list | None = None,
+    provider_name: str | None = None,
 ) -> dict:
     """Assemble the full pipeline and run it. Returns the final state dict."""
     registry = build_default_registry()
@@ -49,8 +77,7 @@ def run_demo(
     )
     validator = SafetyValidator(registry, policy)
     store = JsonFileStore(runs_dir)
-    script = ScriptedPlanner.demo_script(target)
-    planner = ScriptedPlanner(script)
+    planner = build_planner(registry, target, provider_name)
     sinks = sinks if sinks is not None else [PrinterSink(), InMemorySink()]
 
     runtime = AgentRuntime(
@@ -80,6 +107,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--max-steps", type=int, default=6)
     parser.add_argument(
+        "--provider",
+        default=None,
+        choices=["mock", "openai_compatible"],
+        help="planner backend (default: env AICYBERSEC_MODEL_PROVIDER or mock)",
+    )
+    parser.add_argument(
         "--list-tools", action="store_true", help="print registered tool specs and exit"
     )
     args = parser.parse_args(argv)
@@ -101,12 +134,17 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  runs dir: {runs_dir}")
     print()
 
-    final = run_demo(
-        goal=args.goal,
-        target=args.target,
-        runs_dir=runs_dir,
-        max_steps=args.max_steps,
-    )
+    try:
+        final = run_demo(
+            goal=args.goal,
+            target=args.target,
+            runs_dir=runs_dir,
+            max_steps=args.max_steps,
+            provider_name=args.provider,
+        )
+    except ValueError as exc:
+        print(f"configuration error: {exc}", file=sys.stderr)
+        return 2
 
     print()
     print(f"  run id : {final['run_id']}")

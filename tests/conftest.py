@@ -27,6 +27,16 @@ def reset_caches() -> None:
     get_backend_settings.cache_clear()
 
 
+# Model selection must never leak from the developer's shell into tests:
+# the normal suite runs mock/scripted only (M3-C hermeticity rule).
+_MODEL_ENV_VARS = (
+    "AICYBERSEC_MODEL_PROVIDER",
+    "AICYBERSEC_MODEL_BASE_URL",
+    "AICYBERSEC_MODEL_API_KEY",
+    "AICYBERSEC_MODEL_NAME",
+)
+
+
 @pytest.fixture()
 def runs_dir(tmp_path: Path) -> Path:
     """Temporary per-test directory for state/trajectory files."""
@@ -38,6 +48,8 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Isolated environment: AICYBERSEC_RUNS_DIR pointed at a temp directory."""
     monkeypatch.setenv("AICYBERSEC_RUNS_DIR", str(tmp_path / "runs"))
     for var in ("AICYBERSEC_ALLOWED_TARGETS", "AICYBERSEC_MAX_STEPS", "AICYBERSEC_MAX_DANGER"):
+        monkeypatch.delenv(var, raising=False)
+    for var in _MODEL_ENV_VARS:
         monkeypatch.delenv(var, raising=False)
 
 
@@ -51,6 +63,8 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """
     monkeypatch.setenv("AICYBERSEC_RUNS_DIR", str(tmp_path / "runs"))
     monkeypatch.setenv("AICYBERSEC_ADMIN_EMAIL", "")
+    for var in _MODEL_ENV_VARS:
+        monkeypatch.delenv(var, raising=False)
     from agent_core.config import get_settings
 
     get_settings.cache_clear()
@@ -78,6 +92,8 @@ def client_seeded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AICYBERSEC_RUNS_DIR", str(tmp_path / "runs"))
     monkeypatch.setenv("AICYBERSEC_ADMIN_EMAIL", "admin@aicybersec.local")
     monkeypatch.setenv("AICYBERSEC_ADMIN_PASSWORD", "admin-dev-password-change-me")
+    for var in _MODEL_ENV_VARS:
+        monkeypatch.delenv(var, raising=False)
     from agent_core.config import get_settings
 
     get_settings.cache_clear()

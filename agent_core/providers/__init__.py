@@ -5,7 +5,9 @@ from agent_core.providers.base import (
     ModelRequest,
     ModelResponse,
 )
+from agent_core.providers.factory import build_provider
 from agent_core.providers.mock import MockModelProvider
+from agent_core.providers.openai_compatible import OpenAICompatibleProvider
 
 __all__ = [
     "Message",
@@ -13,4 +15,6 @@ __all__ = [
     "ModelProvider",
     "ModelRequest",
     "ModelResponse",
+    "OpenAICompatibleProvider",
+    "build_provider",
 ]

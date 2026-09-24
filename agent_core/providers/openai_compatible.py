@@ -14,23 +14,31 @@ import json
 import urllib.error
 import urllib.request
 
-from agent_core.providers.base import Message, ModelRequest, ModelResponse
+from agent_core.providers.base import ModelRequest, ModelResponse
 
 
 class OpenAICompatibleProvider:
     """Minimal OpenAI-compatible chat client."""
 
     def __init__(
-        self, base_url: str, api_key: str, model: str, timeout_s: float = 60
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        timeout_s: float = 60,
+        max_response_chars: int = 8000,
     ) -> None:
         if not base_url or not base_url.strip():
             raise ValueError("base_url must be non-empty")
         if not model or not model.strip():
             raise ValueError("model must be non-empty")
+        if max_response_chars <= 0:
+            raise ValueError("max_response_chars must be positive")
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
         self.timeout_s = timeout_s
+        self.max_response_chars = max_response_chars
 
     def _payload(self, request: ModelRequest) -> dict:
         payload: dict = {
@@ -59,10 +67,18 @@ class OpenAICompatibleProvider:
                 body = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             raise RuntimeError(f"model endpoint returned HTTP {exc.code}") from exc
+        except TimeoutError as exc:
+            # socket.timeout surfaces here, NOT as URLError - fail explicitly.
+            raise TimeoutError(
+                f"model request timed out after {self.timeout_s}s"
+            ) from exc
         except urllib.error.URLError as exc:
             raise ConnectionError(f"cannot reach model endpoint: {exc.reason}") from exc
         try:
             content = body["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise RuntimeError("model response missing choices[0].message.content") from exc
-        return ModelResponse(raw_text=content or "")
+        text = content or ""
+        if len(text) > self.max_response_chars:
+            text = text[: self.max_response_chars]
+        return ModelResponse(raw_text=text)
