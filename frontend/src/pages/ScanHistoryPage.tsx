@@ -3,22 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import {
   History,
   Search,
-  Filter,
-  Radio,
-  Bug,
   ShieldPlus,
   ArrowRight,
-  ExternalLink,
   RotateCcw,
-  Clock,
-  Terminal,
 } from 'lucide-react';
 import { useScans } from '../context/ScanContext';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { DemoBanner } from '../components/common/DemoBanner';
-import { SCAN_PROFILES, ScanStatus } from '../types/scan';
+import { SCAN_PROFILES } from '../types/scan';
 
 export const ScanHistoryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -37,17 +31,26 @@ export const ScanHistoryPage: React.FC = () => {
         scan.goal.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesStatus =
-        selectedStatus === 'all' || scan.status === selectedStatus;
+        selectedStatus === 'all' ||
+        scan.status === selectedStatus ||
+        (selectedStatus === 'completed' && scan.status === 'finished');
 
       const matchesProfile =
-        selectedProfile === 'all' || scan.profile === selectedProfile;
+        selectedProfile === 'all' ||
+        scan.profile === selectedProfile ||
+        (selectedProfile === 'web' && scan.profile === 'web_assessment') ||
+        (selectedProfile === 'full' && scan.profile === 'full_assessment');
 
       return matchesSearch && matchesStatus && matchesProfile;
     });
   }, [scans, searchQuery, selectedStatus, selectedProfile]);
 
-  const totalCompleted = scans.filter((s) => s.status === 'finished').length;
-  const totalRunning = scans.filter((s) => s.status === 'running').length;
+  const totalCompleted = scans.filter(
+    (s) => s.status === 'completed' || s.status === 'finished'
+  ).length;
+  const totalActive = scans.filter(
+    (s) => s.status === 'running' || s.status === 'queued' || s.status === 'initializing'
+  ).length;
   const totalFindingsFound = scans.reduce((acc, s) => acc + s.findingsCount.total, 0);
 
   return (
@@ -87,7 +90,7 @@ export const ScanHistoryPage: React.FC = () => {
         </div>
         <div className="p-4 rounded-xl border border-sentinel-border bg-sentinel-surface">
           <span className="text-[11px] font-mono uppercase text-sentinel-dim block">Active Workers</span>
-          <span className="text-2xl font-bold font-mono text-cyan-400 mt-1 block">{totalRunning}</span>
+          <span className="text-2xl font-bold font-mono text-cyan-400 mt-1 block">{totalActive}</span>
         </div>
         <div className="p-4 rounded-xl border border-sentinel-border bg-sentinel-surface">
           <span className="text-[11px] font-mono uppercase text-sentinel-dim block">Total Findings</span>
@@ -131,8 +134,11 @@ export const ScanHistoryPage: React.FC = () => {
                 className="px-2.5 py-1.5 rounded-lg bg-sentinel-bg border border-sentinel-border text-xs text-sentinel-text focus:outline-none focus:border-sentinel-cyan"
               >
                 <option value="all">All Statuses</option>
+                <option value="queued">Queued</option>
+                <option value="initializing">Initializing</option>
                 <option value="running">Running</option>
-                <option value="finished">Completed</option>
+                <option value="completed">Completed</option>
+                <option value="cancelling">Cancelling</option>
                 <option value="cancelled">Stopped</option>
                 <option value="failed">Failed</option>
               </select>
@@ -147,8 +153,8 @@ export const ScanHistoryPage: React.FC = () => {
               >
                 <option value="all">All Profiles</option>
                 <option value="recon">Reconnaissance</option>
-                <option value="web_assessment">Web Assessment</option>
-                <option value="full_assessment">Full Assessment</option>
+                <option value="web">Web Assessment</option>
+                <option value="full">Full Assessment</option>
               </select>
             </div>
           </div>
@@ -187,12 +193,15 @@ export const ScanHistoryPage: React.FC = () => {
                 {filteredScans.map((scan) => {
                   const profile = SCAN_PROFILES[scan.profile] || { name: scan.profile };
 
-                  const start = new Date(scan.startedAt).getTime();
-                  const end = scan.completedAt ? new Date(scan.completedAt).getTime() : Date.now();
-                  const durationSec = Math.max(0, Math.floor((end - start) / 1000));
-                  const durationMins = Math.floor(durationSec / 60);
-                  const durationSecs = durationSec % 60;
-                  const durationFormatted = `${durationMins}m ${durationSecs}s`;
+                  let durationFormatted = 'Queued';
+                  if (scan.status !== 'queued' && scan.startedAt) {
+                    const start = new Date(scan.startedAt).getTime();
+                    const end = scan.completedAt ? new Date(scan.completedAt).getTime() : start;
+                    const durationSec = Math.max(0, Math.floor((end - start) / 1000));
+                    const durationMins = Math.floor(durationSec / 60);
+                    const durationSecs = durationSec % 60;
+                    durationFormatted = scan.completedAt ? `${durationMins}m ${durationSecs}s` : 'Active';
+                  }
 
                   return (
                     <tr
@@ -206,8 +215,14 @@ export const ScanHistoryPage: React.FC = () => {
                             {scan.target}
                           </code>
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-sentinel-dim font-mono">{scan.id}</span>
-                            <span className="text-[10px] text-cyan-400/80 font-mono">Simulated</span>
+                            <span className="text-[10px] text-sentinel-dim font-mono">{scan.id.slice(0, 8)}</span>
+                            <span
+                              className={`text-[10px] font-mono ${
+                                scan.isSimulated ? 'text-amber-400/80' : 'text-emerald-400/80'
+                              }`}
+                            >
+                              {scan.isSimulated ? 'Simulated' : 'REST v1'}
+                            </span>
                           </div>
                         </div>
                       </td>

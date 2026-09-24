@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScanStatus } from '../../types/scan';
-import { CheckCircle2, AlertOctagon, Ban, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertOctagon, Ban, Loader2, Clock, Sparkles } from 'lucide-react';
 
 interface StatusBadgeProps {
   status: ScanStatus;
@@ -9,12 +9,40 @@ interface StatusBadgeProps {
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' }) => {
   const config = {
+    queued: {
+      label: 'Queued',
+      icon: Clock,
+      classes: 'bg-indigo-950/60 border-indigo-700/80 text-indigo-300',
+      iconClass: 'text-indigo-400',
+      dotClass: 'bg-indigo-400',
+    },
+    initializing: {
+      label: 'Initializing',
+      icon: Sparkles,
+      classes: 'bg-sky-950/60 border-sky-700/80 text-sky-300',
+      iconClass: 'text-sky-400 animate-pulse',
+      dotClass: 'bg-sky-400 animate-ping',
+    },
     running: {
       label: 'Running',
       icon: Loader2,
       classes: 'bg-cyan-950/60 border-cyan-700/80 text-cyan-300',
       iconClass: 'animate-spin text-cyan-400',
       dotClass: 'bg-cyan-400 animate-ping',
+    },
+    cancelling: {
+      label: 'Cancelling',
+      icon: Loader2,
+      classes: 'bg-amber-950/60 border-amber-700/80 text-amber-300',
+      iconClass: 'animate-spin text-amber-400',
+      dotClass: 'bg-amber-400',
+    },
+    completed: {
+      label: 'Completed',
+      icon: CheckCircle2,
+      classes: 'bg-emerald-950/60 border-emerald-700/80 text-emerald-300',
+      iconClass: 'text-emerald-400',
+      dotClass: 'bg-emerald-400',
     },
     finished: {
       label: 'Completed',

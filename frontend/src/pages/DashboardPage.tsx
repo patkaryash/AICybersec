@@ -1,16 +1,14 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-  ShieldAlert,
   Activity,
   Bug,
   Globe,
   ShieldPlus,
   ArrowRight,
   Radio,
-  FileText,
-  Clock,
-  ExternalLink,
+  AlertTriangle,
+  RotateCcw,
 } from 'lucide-react';
 import { useScans } from '../context/ScanContext';
 import { StatCard } from '../components/common/StatCard';
@@ -24,9 +22,11 @@ import ThreatGlobe from '../components/common/ThreatGlobe';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { scans, findings, severityStats, loading } = useScans();
+  const { scans, findings, severityStats, loading, error, refreshData } = useScans();
 
-  const runningScans = scans.filter((s) => s.status === 'running');
+  const activeScans = scans.filter(
+    (s) => s.status === 'running' || s.status === 'queued' || s.status === 'initializing'
+  );
   const recentScans = scans.slice(0, 6);
 
   // Derive unique monitored targets
@@ -43,8 +43,25 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Simulation / Demo Notification */}
+      {/* Simulation / Live Environment Notification */}
       <DemoBanner variant="compact" />
+
+      {/* Backend API Error Banner if request failed */}
+      {error && (
+        <div className="p-4 rounded-xl border border-rose-900/80 bg-rose-950/40 text-xs text-rose-300 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle size={16} className="text-rose-400 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button
+            onClick={() => refreshData()}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-900/50 hover:bg-rose-900 text-rose-200 font-mono text-[11px] transition-colors shrink-0"
+          >
+            <RotateCcw size={12} />
+            <span>Retry Connection</span>
+          </button>
+        </div>
+      )}
 
       {/* Top Hero / Welcome Banner with Integrated Threat Globe */}
       <div className="relative overflow-hidden rounded-xl border border-sentinel-border bg-gradient-to-r from-sentinel-surface via-[#131C2E] to-sentinel-surface p-6 shadow-md">
@@ -99,11 +116,11 @@ export const DashboardPage: React.FC = () => {
         />
         <StatCard
           title="Active Running Scans"
-          value={runningScans.length}
-          subtitle={runningScans.length > 0 ? 'Live telemetry transmitting' : 'No active workers'}
+          value={activeScans.length}
+          subtitle={activeScans.length > 0 ? 'Live telemetry transmitting' : 'No active workers'}
           icon={Radio}
-          accentColor={runningScans.length > 0 ? 'emerald' : 'purple'}
-          badge={runningScans.length > 0 ? { text: 'Realtime' } : undefined}
+          accentColor={activeScans.length > 0 ? 'emerald' : 'purple'}
+          badge={activeScans.length > 0 ? { text: 'Active' } : undefined}
         />
         <StatCard
           title="Vulnerabilities Found"
@@ -233,7 +250,7 @@ export const DashboardPage: React.FC = () => {
                           <code className="text-sentinel-text font-mono font-medium group-hover:text-sentinel-cyan transition-colors">
                             {scan.target}
                           </code>
-                          <span className="text-[10px] text-sentinel-dim font-mono">({scan.id})</span>
+                          <span className="text-[10px] text-sentinel-dim font-mono">({scan.id.slice(0, 8)})</span>
                         </div>
                       </td>
                       <td className="px-4 py-3.5 font-medium text-sentinel-text">
