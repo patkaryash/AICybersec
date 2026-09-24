@@ -8,7 +8,6 @@ import {
   History,
   Shield,
   Activity,
-  Terminal,
   X,
 } from 'lucide-react';
 import { useScans } from '../context/ScanContext';
@@ -19,11 +18,13 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const { scans } = useScans();
+  const { scans, isDemo } = useScans();
   const location = useLocation();
 
-  const runningScans = scans.filter((s) => s.status === 'running');
-  const activeScan = runningScans[0] || scans[0];
+  const activeScans = scans.filter(
+    (s) => s.status === 'running' || s.status === 'queued' || s.status === 'initializing'
+  );
+  const activeScan = activeScans[0] || scans[0];
 
   const navItems = [
     {
@@ -42,8 +43,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       to: activeScan ? `/agent/${activeScan.id}` : '/agent/demo',
       label: 'Live AI Agent',
       icon: Radio,
-      badge: runningScans.length > 0 ? `${runningScans.length} active` : null,
-      pulse: runningScans.length > 0,
+      badge: activeScans.length > 0 ? `${activeScans.length} active` : null,
+      pulse: activeScans.length > 0,
     },
     {
       to: '/findings',
@@ -167,12 +168,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             </div>
             <div className="text-[10px] text-sentinel-dim font-mono space-y-0.5">
               <div className="flex justify-between">
-                <span>Planner:</span>
-                <span className="text-sentinel-text">Mock / Scripted</span>
+                <span>Mode:</span>
+                <span className={isDemo ? 'text-amber-400' : 'text-emerald-400'}>
+                  {isDemo ? 'Offline Demo' : 'REST v1 API'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Target Mode:</span>
-                <span className="text-cyan-400">Deterministic</span>
+                <span className="text-cyan-400">Strict Scope</span>
               </div>
             </div>
           </div>

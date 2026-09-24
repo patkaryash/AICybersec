@@ -1,19 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import {
   Search,
-  Filter,
   Bug,
-  Globe,
-  ArrowUpDown,
-  ExternalLink,
   ChevronRight,
-  ShieldCheck,
-  CheckCircle,
-  Clock,
   RotateCcw,
 } from 'lucide-react';
 import { useScans } from '../context/ScanContext';
-import { Finding, Severity, FindingStatus } from '../types/finding';
+import { Finding } from '../types/finding';
 import { SeverityBadge } from '../components/common/SeverityBadge';
 import { FindingDetailModal } from '../components/common/FindingDetailModal';
 import { Card } from '../components/common/Card';
@@ -211,8 +204,14 @@ export const FindingsPage: React.FC = () => {
                           {finding.title}
                         </span>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-sentinel-dim font-mono">{finding.id}</span>
-                          <span className="text-[10px] text-cyan-400/80 font-mono">Synthetic</span>
+                          <span className="text-[10px] text-sentinel-dim font-mono">{finding.id.slice(0, 8)}</span>
+                          <span
+                            className={`text-[10px] font-mono ${
+                              finding.isSynthetic ? 'text-amber-400/80' : 'text-emerald-400/80'
+                            }`}
+                          >
+                            {finding.isSynthetic ? 'Synthetic' : 'Verified Evidence'}
+                          </span>
                         </div>
                       </div>
                     </td>

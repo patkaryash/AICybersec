@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Radio,
   Clock,
   Ban,
   Bug,
@@ -12,13 +11,11 @@ import {
   ChevronUp,
   Terminal,
   Cpu,
-  ShieldAlert,
   CheckCircle2,
   Copy,
   Check,
   AlertCircle,
-  ExternalLink,
-  ArrowRight,
+  Inbox,
 } from 'lucide-react';
 import { useScans } from '../context/ScanContext';
 import { useTimer } from '../hooks/useTimer';
@@ -27,29 +24,78 @@ import { Card } from '../components/common/Card';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { DemoBanner } from '../components/common/DemoBanner';
 import { SCAN_PROFILES } from '../types/scan';
+import { eventService } from '../services/api/eventService';
+import { AgentTimelineEvent } from '../types/agent';
 
 export const LiveAgentPage: React.FC = () => {
   const { scanId } = useParams<{ scanId: string }>();
   const navigate = useNavigate();
-  const { scans, stopScan } = useScans();
+  const { scans, stopScan, isDemo } = useScans();
 
   const [copiedId, setCopiedId] = useState(false);
   const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
+  const [realEvents, setRealEvents] = useState<AgentTimelineEvent[]>([]);
 
   // Find targeted scan, or fallback to first running/available scan
-  const scan = scans.find((s) => s.id === scanId) || scans.find((s) => s.status === 'running') || scans[0];
+  const scan =
+    scans.find((s) => s.id === scanId) ||
+    scans.find((s) => s.status === 'running' || s.status === 'queued') ||
+    scans[0];
 
   const profileInfo = scan ? SCAN_PROFILES[scan.profile] : null;
 
   // Live Elapsed Timer
+  const isRunning = scan?.status === 'running';
   const { formattedTime } = useTimer(
     scan?.startedAt || new Date().toISOString(),
     scan?.completedAt,
-    scan?.status === 'running'
+    isRunning
   );
 
-  // Progressive simulation hook
-  const { events, currentStepIndex, isPaused, togglePause, fastForward } = useAgentSimulation(scan);
+  // Progressive simulation hook (for demo/simulated scans)
+  const isSimulated = isDemo || Boolean(scan?.isSimulated);
+  const {
+    events: simulatedEvents,
+    isPaused,
+    togglePause,
+    fastForward,
+  } = useAgentSimulation(isSimulated ? scan : undefined);
+
+  // Fetch real agent events for real backend scans
+  useEffect(() => {
+    if (!scan || isSimulated) return;
+
+    let isMounted = true;
+    const fetchEvents = async () => {
+      try {
+        const rawEvents = await eventService.listAgentEvents(scan.id, 0, 50);
+        if (isMounted) {
+          const mapped: AgentTimelineEvent[] = rawEvents.map((e) => ({
+            id: String(e.seq),
+            step: e.step ?? 1,
+            type: e.event_type as AgentTimelineEvent['type'],
+            timestamp: e.created_at,
+            title: e.event_type.replace(/_/g, ' ').toUpperCase(),
+            description: JSON.stringify(e.data),
+            status: 'completed',
+            payload: e.data,
+          }));
+          setRealEvents(mapped);
+        }
+      } catch (err) {
+        console.warn('Real agent events polling error:', err);
+      }
+    };
+
+    fetchEvents();
+    const interval = setInterval(fetchEvents, 5000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [scan, isSimulated]);
+
+  const events = isSimulated ? simulatedEvents : realEvents;
 
   const handleCopyScanId = () => {
     if (!scan) return;
@@ -80,11 +126,12 @@ export const LiveAgentPage: React.FC = () => {
     );
   }
 
-  const isRunning = scan.status === 'running';
+  const isCancellable =
+    scan.status === 'queued' || scan.status === 'initializing' || scan.status === 'running';
 
   return (
     <div className="space-y-6">
-      {/* Persistent Simulated Data Banner */}
+      {/* Persistent Environment Notice */}
       <DemoBanner />
 
       {/* Live Agent Control Header Card */}
@@ -101,7 +148,7 @@ export const LiveAgentPage: React.FC = () => {
                 className="text-xs font-mono text-sentinel-dim bg-sentinel-elevated hover:text-sentinel-text px-2 py-0.5 rounded border border-sentinel-border flex items-center gap-1 transition-colors"
                 title="Copy Scan ID"
               >
-                <span>{scan.id}</span>
+                <span>{scan.id.slice(0, 12)}...</span>
                 {copiedId ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
               </button>
               <StatusBadge status={scan.status} size="sm" />
@@ -124,7 +171,7 @@ export const LiveAgentPage: React.FC = () => {
                   Duration
                 </span>
                 <span className="font-mono text-sm font-bold text-sentinel-text">
-                  {formattedTime}
+                  {scan.status === 'queued' ? 'Queued' : formattedTime}
                 </span>
               </div>
             </div>
@@ -144,7 +191,7 @@ export const LiveAgentPage: React.FC = () => {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
-              {isRunning && (
+              {isSimulated && isRunning && (
                 <>
                   <button
                     onClick={togglePause}
@@ -161,15 +208,17 @@ export const LiveAgentPage: React.FC = () => {
                   >
                     <FastForward size={14} />
                   </button>
-
-                  <button
-                    onClick={() => stopScan(scan.id)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-rose-800/80 bg-rose-950/40 text-rose-300 hover:bg-rose-900/50 text-xs font-medium transition-colors"
-                  >
-                    <Ban size={14} />
-                    <span className="hidden sm:inline">Stop Scan</span>
-                  </button>
                 </>
+              )}
+
+              {isCancellable && (
+                <button
+                  onClick={() => stopScan(scan.id)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-rose-800/80 bg-rose-950/40 text-rose-300 hover:bg-rose-900/50 text-xs font-medium transition-colors"
+                >
+                  <Ban size={14} />
+                  <span className="hidden sm:inline">Cancel Scan</span>
+                </button>
               )}
 
               <button
@@ -207,146 +256,143 @@ export const LiveAgentPage: React.FC = () => {
                 Live Reasoning Loop Active
               </span>
             )}
+            {scan.status === 'queued' && (
+              <span className="text-xs font-mono text-indigo-400 flex items-center gap-1.5">
+                <Clock size={13} />
+                Status: Queued (Phase 2 Contract)
+              </span>
+            )}
           </div>
         }
         subtitle="Chronological sequence of autonomous decisions, tool executions, and security findings"
       >
-        <div className="relative pl-6 sm:pl-8 space-y-8 before:absolute before:left-3 sm:before:left-4 before:top-3 before:bottom-3 before:w-0.5 before:bg-sentinel-border">
-          {events.map((evt, idx) => {
-            const isCompleted = evt.status === 'completed';
-            const isInProgress = evt.status === 'in_progress';
-            const isPending = evt.status === 'pending';
-            const isExpanded = expandedEvents[evt.id] || false;
+        {events.length === 0 ? (
+          <div className="py-12 text-center space-y-3">
+            <div className="w-12 h-12 rounded-xl bg-sentinel-elevated border border-sentinel-border flex items-center justify-center text-sentinel-dim mx-auto">
+              <Inbox size={22} />
+            </div>
+            <h4 className="text-sm font-semibold text-sentinel-text">
+              {scan.status === 'queued'
+                ? 'Scan Persisted & Queued'
+                : 'No Agent Telemetry Events Recorded'}
+            </h4>
+            <p className="text-xs text-sentinel-muted max-w-md mx-auto leading-relaxed">
+              {scan.status === 'queued'
+                ? 'Under the approved Phase 2 contract, scans are persisted with status "queued". Automated tool execution is added in Phase 3. Live events will stream when execution begins.'
+                : 'Telemetry events will appear here once the agent begins orchestrating security assessment tools.'}
+            </p>
+          </div>
+        ) : (
+          <div className="relative pl-6 sm:pl-8 space-y-8 before:absolute before:left-3 sm:before:left-4 before:top-3 before:bottom-3 before:w-0.5 before:bg-sentinel-border">
+            {events.map((evt, idx) => {
+              const isCompleted = evt.status === 'completed';
+              const isInProgress = evt.status === 'in_progress';
+              const isExpanded = expandedEvents[evt.id] || false;
 
-            return (
-              <div key={evt.id} className="relative group">
-                {/* Step Marker Node */}
-                <div
-                  className={`absolute -left-6 sm:-left-8 top-0.5 w-6 h-6 rounded-full flex items-center justify-center font-mono text-[11px] font-bold border transition-all ${
-                    isCompleted
-                      ? 'bg-emerald-950 border-emerald-600 text-emerald-400'
-                      : isInProgress
-                      ? 'bg-cyan-950 border-cyan-400 text-cyan-300 ring-4 ring-cyan-500/20 animate-pulse'
-                      : 'bg-sentinel-elevated border-sentinel-border text-sentinel-dim'
-                  }`}
-                >
-                  {isCompleted ? <CheckCircle2 size={13} /> : idx + 1}
-                </div>
-
-                {/* Event Card Content */}
-                <div
-                  className={`rounded-xl border p-4 transition-all ${
-                    isInProgress
-                      ? 'bg-sentinel-surface border-cyan-700/80 shadow-[0_0_15px_rgba(6,182,212,0.1)]'
-                      : isCompleted
-                      ? 'bg-sentinel-surface/80 border-sentinel-border hover:border-sentinel-border-light'
-                      : 'bg-sentinel-surface/40 border-sentinel-border/50 opacity-60'
-                  }`}
-                >
-                  {/* Event Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold text-sentinel-text tracking-tight">
-                        {evt.title}
-                      </span>
-                      {evt.tool && (
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sentinel-elevated border border-sentinel-border text-sentinel-cyan">
-                          {evt.tool}
-                        </span>
-                      )}
-                      {isInProgress && (
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 animate-pulse">
-                          EXECUTING
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3 text-xs text-sentinel-dim font-mono">
-                      {evt.durationMs && (
-                        <span>{(evt.durationMs / 1000).toFixed(1)}s</span>
-                      )}
-                      <span>{new Date(evt.timestamp).toLocaleTimeString()}</span>
-                    </div>
+              return (
+                <div key={evt.id} className="relative group">
+                  {/* Step Marker Node */}
+                  <div
+                    className={`absolute -left-6 sm:-left-8 top-0.5 w-6 h-6 rounded-full flex items-center justify-center font-mono text-[11px] font-bold border transition-all ${
+                      isCompleted
+                        ? 'bg-emerald-950 border-emerald-600 text-emerald-400'
+                        : isInProgress
+                        ? 'bg-cyan-950 border-cyan-400 text-cyan-300 ring-4 ring-cyan-500/20 animate-pulse'
+                        : 'bg-sentinel-elevated border-sentinel-border text-sentinel-dim'
+                    }`}
+                  >
+                    {isCompleted ? <CheckCircle2 size={13} /> : idx + 1}
                   </div>
 
-                  {/* Plain-English Action Description */}
-                  <p className="text-xs text-sentinel-muted mt-2 leading-relaxed">
-                    {evt.description}
-                  </p>
-
-                  {/* Plain-English AI Rationale Box */}
-                  {evt.reasoning && (
-                    <div className="mt-3 p-3 rounded-lg border border-purple-900/40 bg-purple-950/20 text-xs flex items-start gap-2.5">
-                      <Cpu size={14} className="text-purple-400 shrink-0 mt-0.5" />
-                      <div className="space-y-0.5">
-                        <span className="font-semibold text-purple-300 font-mono text-[11px] block">
-                          AI Agent Rationale & Context
+                  {/* Event Card Content */}
+                  <div
+                    className={`rounded-xl border p-4 transition-all ${
+                      isInProgress
+                        ? 'bg-sentinel-surface border-cyan-700/80 shadow-[0_0_15px_rgba(6,182,212,0.1)]'
+                        : isCompleted
+                        ? 'bg-sentinel-surface/80 border-sentinel-border hover:border-sentinel-border-light'
+                        : 'bg-sentinel-surface/40 border-sentinel-border/50 opacity-60'
+                    }`}
+                  >
+                    {/* Event Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-sentinel-text tracking-tight">
+                          {evt.title}
                         </span>
-                        <p className="text-sentinel-text/90 leading-relaxed text-[11px]">
-                          {evt.reasoning}
-                        </p>
+                        {evt.tool && (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sentinel-elevated border border-sentinel-border text-sentinel-cyan">
+                            {evt.tool}
+                          </span>
+                        )}
+                        {isInProgress && (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 animate-pulse">
+                            EXECUTING
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 text-xs text-sentinel-dim font-mono">
+                        {evt.durationMs && (
+                          <span>{(evt.durationMs / 1000).toFixed(1)}s</span>
+                        )}
+                        <span>{new Date(evt.timestamp).toLocaleTimeString()}</span>
                       </div>
                     </div>
-                  )}
 
-                  {/* Toggleable Technical Details */}
-                  {isCompleted && (
-                    <div className="mt-3 pt-2 border-t border-sentinel-border/60">
-                      <button
-                        onClick={() => toggleEventExpand(evt.id)}
-                        className="text-[11px] text-sentinel-dim hover:text-sentinel-cyan flex items-center gap-1 font-mono transition-colors"
-                      >
-                        <span>{isExpanded ? 'Hide Technical Envelope' : 'Inspect Telemetry Payload'}</span>
-                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                      </button>
+                    {/* Plain-English Action Description */}
+                    <p className="text-xs text-sentinel-muted mt-2 leading-relaxed">
+                      {evt.description}
+                    </p>
 
-                      {isExpanded && (
-                        <pre className="mt-2 p-3 bg-black/60 border border-sentinel-border rounded-lg text-[11px] font-mono text-emerald-300 overflow-x-auto whitespace-pre leading-relaxed">
-                          {JSON.stringify(
-                            {
-                              event: evt.type,
-                              step: evt.step,
-                              target: scan.target,
-                              tool: evt.tool,
-                              status: evt.status,
-                              timestamp: evt.timestamp,
-                              synthetic: true,
-                            },
-                            null,
-                            2
-                          )}
-                        </pre>
-                      )}
-                    </div>
-                  )}
+                    {/* Plain-English AI Rationale Box */}
+                    {evt.reasoning && (
+                      <div className="mt-3 p-3 rounded-lg border border-purple-900/40 bg-purple-950/20 text-xs flex items-start gap-2.5">
+                        <Cpu size={14} className="text-purple-400 shrink-0 mt-0.5" />
+                        <div className="space-y-0.5">
+                          <span className="font-semibold text-purple-300 font-mono text-[11px] block">
+                            AI Agent Rationale & Context
+                          </span>
+                          <p className="text-sentinel-text/90 leading-relaxed text-[11px]">
+                            {evt.reasoning}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Toggleable Technical Details */}
+                    {isCompleted && (
+                      <div className="mt-3 pt-2 border-t border-sentinel-border/60">
+                        <button
+                          onClick={() => toggleEventExpand(evt.id)}
+                          className="text-[11px] text-sentinel-dim hover:text-sentinel-cyan flex items-center gap-1 font-mono transition-colors"
+                        >
+                          <span>{isExpanded ? 'Hide Technical Envelope' : 'Inspect Telemetry Payload'}</span>
+                          {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                        </button>
+
+                        {isExpanded && (
+                          <pre className="mt-2 p-3 bg-black/60 border border-sentinel-border rounded-lg text-[11px] font-mono text-emerald-300 overflow-x-auto whitespace-pre leading-relaxed">
+                            {JSON.stringify(
+                              evt.payload || {
+                                event: evt.type,
+                                step: evt.step,
+                                target: scan.target,
+                                tool: evt.tool,
+                                status: evt.status,
+                                timestamp: evt.timestamp,
+                              },
+                              null,
+                              2
+                            )}
+                          </pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Completed State Callout */}
-        {scan.status === 'finished' && (
-          <div className="mt-8 p-5 rounded-xl border border-emerald-800/80 bg-emerald-950/20 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-950 border border-emerald-700 text-emerald-400">
-                <CheckCircle2 size={24} />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-emerald-300">Penetration Test Concluded</h4>
-                <p className="text-xs text-emerald-200/80 mt-0.5">
-                  Autonomous loop finished with {scan.findingsCount.total} verified security findings.
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => navigate('/findings')}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-emerald-950 font-bold text-xs hover:bg-emerald-400 transition-colors shadow-sm"
-            >
-              <span>Review Findings</span>
-              <ArrowRight size={14} />
-            </button>
+              );
+            })}
           </div>
         )}
       </Card>
