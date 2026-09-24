@@ -30,7 +30,7 @@ class BackendSettings(BaseSettings):
     # --- Auth / JWT ---
     jwt_secret: str = DEV_INSECURE_JWT_SECRET
     jwt_expiry_s: int = 86400
-    admin_email: str = "admin@aicybersec.local"
+    admin_email: str = "admin@aicybersec.dev"
     admin_password: str = "admin-dev-password-change-me"
 
     # --- CORS (comma-separated allowed origins; never "*" with credentials) ---

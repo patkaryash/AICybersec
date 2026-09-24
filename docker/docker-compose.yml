@@ -36,7 +36,7 @@ services:
       AICYBERSEC_JWT_SECRET: dev-insecure-jwt-secret-change-me
       AICYBERSEC_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       AICYBERSEC_RUNS_DIR: /app/runs
-      AICYBERSEC_ADMIN_EMAIL: admin@aicybersec.local
+      AICYBERSEC_ADMIN_EMAIL: admin@aicybersec.dev
       AICYBERSEC_ADMIN_PASSWORD: admin-dev-password-change-me
     ports:
       - "8000:8000"
