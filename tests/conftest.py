@@ -53,6 +53,33 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(var, raising=False)
 
 
+@pytest.fixture(scope="session")
+def pg_engine():
+    """Session-scoped engine on the configured database (DB tests only)."""
+    from backend.db.session import get_engine
+
+    return get_engine()
+
+
+@pytest.fixture()
+def clean_db(pg_engine):
+    """Truncate all platform tables between DB-backed tests.
+
+    DB tests share one PostgreSQL database; without this, registrations,
+    scans and dashboard totals would accumulate across tests and break
+    exact-count assertions.
+    """
+    from sqlalchemy import text
+
+    from backend.db import models  # noqa: F401  (registers tables on metadata)
+    from backend.db.base import Base
+
+    names = [t.name for t in Base.metadata.sorted_tables]
+    statement = "TRUNCATE TABLE " + ", ".join(f'"{n}"' for n in names) + " RESTART IDENTITY CASCADE"
+    with pg_engine.begin() as conn:
+        conn.execute(text(statement))
+
+
 @pytest.fixture()
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """FastAPI TestClient with isolated runs dir and a fresh RunManager.
@@ -87,10 +114,14 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture()
-def client_seeded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """FastAPI TestClient with the admin seed enabled (DB tests only)."""
+def client_seeded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, clean_db):
+    """FastAPI TestClient with the admin seed enabled (DB tests only).
+
+    Depends on clean_db so truncation always happens BEFORE app startup
+    (the lifespan seed then re-creates the admin user on a clean DB).
+    """
     monkeypatch.setenv("AICYBERSEC_RUNS_DIR", str(tmp_path / "runs"))
-    monkeypatch.setenv("AICYBERSEC_ADMIN_EMAIL", "admin@aicybersec.local")
+    monkeypatch.setenv("AICYBERSEC_ADMIN_EMAIL", "admin@aicybersec.dev")
     monkeypatch.setenv("AICYBERSEC_ADMIN_PASSWORD", "admin-dev-password-change-me")
     for var in _MODEL_ENV_VARS:
         monkeypatch.delenv(var, raising=False)

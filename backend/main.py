@@ -4,9 +4,8 @@ Platform backend: /api/v1 routers, envelope + error handlers, CORS,
 request-id middleware, and a lifespan that seeds the default admin user.
 Startup recovery of stale scans lands with the ScanManager (Phase 3).
 
-Legacy routes kept temporarily (deliberate migration in Phase 2):
-- GET /health and the /runs router (removed together with the legacy
-  contract when /api/v1 fully replaces them).
+The legacy API (root /health, /runs) was removed in the Phase 2
+migration - the v1 contract replaces it (see frontend/README.md).
 """
 from __future__ import annotations
 
@@ -17,10 +16,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api import health
+from backend.api import assets, auth, dashboard, events, findings, health, projects, scans
 from backend.core.config import get_backend_settings
 from backend.core.errors import register_exception_handlers
-from backend.routes import runs
 
 logger = logging.getLogger(__name__)
 
@@ -96,11 +94,13 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
     app.include_router(health.router)
-    app.include_router(runs.router)  # legacy /runs API - removed in Phase 2
-
-    @app.get("/health", include_in_schema=False)
-    def legacy_health() -> dict:
-        return {"status": "ok"}
+    app.include_router(auth.router)
+    app.include_router(projects.router)
+    app.include_router(scans.router)
+    app.include_router(findings.router)
+    app.include_router(assets.router)
+    app.include_router(events.router)
+    app.include_router(dashboard.router)
 
     return app
 
