@@ -18,26 +18,31 @@ export const SeverityChart: React.FC<SeverityChartProps> = ({ stats }) => {
 
   const getPercentage = (count: number) => {
     if (total === 0) return 0;
-    return Math.round((count / total) * 100);
+    return Math.min(100, Math.round((count / total) * 100));
+  };
+
+  const barWidth = (count: number) => {
+    if (total === 0) return 0;
+    return Math.min(100, (count / total) * 100);
   };
 
   return (
     <div className="space-y-4">
       {/* Segmented Distribution Bar */}
       <div>
-        <div className="flex justify-between text-xs text-sentinel-muted mb-2">
-          <span>Threat Exposure Distribution</span>
-          <span className="font-mono text-sentinel-text">{total} Recorded Findings</span>
+        <div className="flex justify-between items-baseline text-xs text-sentinel-muted mb-2">
+          <span className="font-medium tracking-wide">Threat Exposure Distribution</span>
+          <span className="text-sentinel-text font-semibold tabular-nums">{total} Recorded Findings</span>
         </div>
 
         {total === 0 ? (
-          <div className="h-3 w-full bg-sentinel-elevated rounded-full overflow-hidden border border-sentinel-border flex items-center justify-center">
+          <div className="h-2.5 w-full bg-sentinel-elevated rounded-full overflow-hidden border border-sentinel-border flex items-center justify-center">
             <span className="text-[10px] text-sentinel-dim">No vulnerabilities detected</span>
           </div>
         ) : (
-          <div className="h-3 w-full bg-sentinel-elevated rounded-full overflow-hidden border border-sentinel-border flex">
+          <div className="h-2.5 w-full bg-sentinel-elevated rounded-full overflow-hidden border border-sentinel-border flex">
             {tiers.map((tier) => {
-              const pct = (tier.count / total) * 100;
+              const pct = barWidth(tier.count);
               if (pct === 0) return null;
               return (
                 <div
@@ -57,14 +62,14 @@ export const SeverityChart: React.FC<SeverityChartProps> = ({ stats }) => {
         {tiers.map((tier) => (
           <div
             key={tier.key}
-            className={`p-3 rounded-lg border ${tier.border} ${tier.bg} flex flex-col justify-between transition-colors`}
+            className={`p-3 rounded-xl border ${tier.border} ${tier.bg} flex flex-col justify-between transition-colors`}
           >
             <div className="flex items-center justify-between">
               <span className={`text-xs font-semibold ${tier.text}`}>{tier.label}</span>
-              <span className="text-[10px] text-sentinel-dim font-mono">{getPercentage(tier.count)}%</span>
+              <span className="text-[11px] text-sentinel-dim tabular-nums">{getPercentage(tier.count)}%</span>
             </div>
-            <div className="mt-1 flex items-baseline">
-              <span className="text-xl font-bold font-mono text-sentinel-text">{tier.count}</span>
+            <div className="mt-1.5 flex items-baseline">
+              <span className="text-[22px] leading-none font-bold tabular-nums text-sentinel-text">{tier.count}</span>
             </div>
           </div>
         ))}
