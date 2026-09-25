@@ -71,6 +71,42 @@ def test_completion_and_security_contract(monkeypatch):
     assert res.returncode == 0 and not res.timed_out and res.stdout == "out"
 
 
+def test_real_process_cancelled_is_actually_killed(tmp_path):
+    """Verification evidence (Phase 3 review §16): cancellation must kill a
+    LIVE operating-system process, not merely change database state.
+
+    Real subprocess (the interpreter itself, cross-platform): the child
+    proves it started (started.txt), then sleeps, then would write
+    survived.txt. Cancel mid-run -> the child must die before finishing
+    the sleep -> survived.txt must never appear.
+    """
+    import sys
+    import time as _time
+
+    started = tmp_path / "started.txt"
+    survived = tmp_path / "survived.txt"
+    child_code = (
+        f"import time; open(r'{started}', 'w').write('ok'); "
+        f"time.sleep(6); open(r'{survived}', 'w').write('ok')"
+    )
+
+    cancel = threading.Event()
+    runner = tr.make_cancelling_runner(cancel)
+    threading.Timer(0.4, cancel.set).start()
+
+    t0 = _time.monotonic()
+    res = runner(sys.executable, ["-c", child_code], timeout_s=60)
+    elapsed = _time.monotonic() - t0
+
+    assert "[cancelled by request]" in res.stderr
+    assert elapsed < 5, "runner should return promptly after cancel"
+    assert started.exists(), "the child process must have actually launched"
+    # wait past the child's full sleep: if the kill failed, the child
+    # would complete its 6s sleep and write the survivor marker.
+    _time.sleep(max(0.0, 7.0 - elapsed))
+    assert not survived.exists(), "the live process was NOT killed by cancellation"
+
+
 def test_cancel_mid_run(monkeypatch):
     _runner(monkeypatch, polls_before_exit=10_000)  # never completes on its own
     cancel = threading.Event()

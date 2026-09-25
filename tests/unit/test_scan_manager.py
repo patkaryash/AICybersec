@@ -115,6 +115,24 @@ def test_full_run_with_mock_planner_completes(tmp_path):
     assert manager.active_scan_ids() == []
 
 
+class _ExplodingPlanner:
+    """Simulates an unexpected worker/planner exception (failure lifecycle)."""
+
+    def decide(self, state):
+        raise RuntimeError("planner exploded")
+
+
+def test_worker_exception_marks_scan_failed(tmp_path):
+    """Verification evidence (review §15): an unexpected worker exception
+    must become a controlled scan failure - never a scan stuck running."""
+    factory = _factory(tmp_path)
+    manager = ScanManager(session_factory=factory, runs_dir=str(tmp_path / "runs"))
+    scan_id = _seed(factory)
+    manager.submit(scan_id, planner=_ExplodingPlanner())
+    assert _wait_status(factory, scan_id, ("failed", "completed", "cancelled")) == "failed"
+    assert manager.active_scan_ids() == []
+
+
 def test_recover_maps_interrupted_scans(tmp_path):
     """Startup recovery (locked decision): queued -> re-submitted;
     initializing/running -> failed; cancelling -> cancelled; terminal
