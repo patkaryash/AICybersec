@@ -104,9 +104,14 @@ def test_auto_submit_runs_to_terminal_and_persists(client_exec):
         f"/api/v1/scans/{scan_id}/agent-events?after_id=0&limit=100", headers=headers
     ).json()["data"]["items"]
     types = [e["event_type"] for e in events]
-    assert "run.started" in types
-    assert "tool.started" in types and "tool.finished" in types
-    assert types[-1] == "run.finished"
+    # Phase 3 §29: persisted events use the frozen snake_case vocabulary;
+    # scan lifecycle events are emitted by the executor, per-step runtime
+    # events are translated by the db_sink (dot-notation never persisted).
+    assert "scan_started" in types
+    # Offline reality: absent binaries fail deterministically -> tool_failed
+    # (tool_completed is covered by the db_sink translation unit tests).
+    assert "tool_started" in types and "tool_failed" in types
+    assert types[-1] == "scan_completed"
     # Reasoning never reaches the database.
     assert "reasoning" not in client_exec.get(
         f"/api/v1/scans/{scan_id}/agent-events?after_id=0&limit=100", headers=headers

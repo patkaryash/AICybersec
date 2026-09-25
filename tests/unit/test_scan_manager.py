@@ -69,20 +69,30 @@ def _wait_status(factory, scan_id, want, timeout=30):
     return _status(factory, scan_id)
 
 
-def test_submit_missing_scan_404(tmp_path):
+def test_submit_missing_scan_aborts_silently(tmp_path):
+    """Phase 3 §7: validation moved to the worker (re-read + confirm
+    queued). Submitting an unknown scan must not crash and must not
+    execute anything."""
     manager = _manager(tmp_path)
-    with pytest.raises(ApiError) as exc:
-        manager.submit(uuid.uuid4())
-    assert exc.value.code == "SCAN_NOT_FOUND"
+    manager.submit(uuid.uuid4())  # no exception: the worker aborts
+    deadline = time.time() + 5
+    while time.time() < deadline and manager.active_scan_ids():
+        time.sleep(0.05)
+    assert manager.active_scan_ids() == []
 
 
-def test_submit_non_queued_rejected(tmp_path):
+def test_submit_non_queued_aborts_without_execution(tmp_path):
+    """Phase 3 §7: a non-queued scan is aborted by the worker's re-read
+    (race-safe) - never executed, never transitioned."""
     factory = _factory(tmp_path)
     scan_id = _seed(factory, status="completed")
     manager = ScanManager(session_factory=factory, runs_dir=str(tmp_path / "runs"))
-    with pytest.raises(ApiError) as exc:
-        manager.submit(scan_id)
-    assert exc.value.code == "INTERNAL_ERROR"
+    manager.submit(scan_id)  # no exception: the worker aborts
+    deadline = time.time() + 5
+    while time.time() < deadline and manager.active_scan_ids():
+        time.sleep(0.05)
+    assert manager.active_scan_ids() == []
+    assert _status(factory, scan_id) == "completed"
 
 
 def test_request_cancel_unknown_is_false(tmp_path):
@@ -106,6 +116,9 @@ def test_full_run_with_mock_planner_completes(tmp_path):
 
 
 def test_recover_maps_interrupted_scans(tmp_path):
+    """Startup recovery (locked decision): queued -> re-submitted;
+    initializing/running -> failed; cancelling -> cancelled; terminal
+    untouched. Idempotent."""
     factory = _factory(tmp_path)
     ids = {
         "initializing": _seed(factory, status="initializing"),
@@ -117,12 +130,18 @@ def test_recover_maps_interrupted_scans(tmp_path):
     out = ScanManager(
         session_factory=factory, runs_dir=str(tmp_path / "runs")
     ).recover()
-    assert out == {"failed": 2, "cancelled": 1}
+    assert out["failed"] == 2
+    assert out["cancelled"] == 1
+    assert out["rescheduled"] == 1
     assert _status(factory, ids["initializing"]) == "failed"
     assert _status(factory, ids["running"]) == "failed"
     assert _status(factory, ids["cancelling"]) == "cancelled"
-    assert _status(factory, ids["queued"]) == "queued"
     assert _status(factory, ids["completed"]) == "completed"
+    # the queued scan was re-scheduled: it leaves the queued state
+    assert _wait_status(factory, ids["queued"], ("completed", "failed")) in (
+        "completed",
+        "failed",
+    )
 
 
 class _BlockingPlanner:
@@ -159,7 +178,7 @@ def test_cancel_during_execution(tmp_path):
     assert manager.active_scan_ids() == []
 
 
-def test_semaphore_bound_and_429(tmp_path):
+def test_pool_queues_when_saturated(tmp_path):
     factory = _factory(tmp_path)
     manager = ScanManager(
         session_factory=factory, runs_dir=str(tmp_path / "runs"), max_concurrent_scans=1
@@ -170,10 +189,16 @@ def test_semaphore_bound_and_429(tmp_path):
     try:
         manager.submit(first, planner=planner)
         assert planner.entered.wait(timeout=30)
-        with pytest.raises(ApiError) as exc:
-            manager.submit(second)
-        assert exc.value.code == "TOO_MANY_SCANS"
-        assert exc.value.http_status == 429
-        assert _status(factory, second) == "queued"  # untouched, retryable
+        # Phase 3 §8: saturation NEVER rejects a scan - the second waits
+        # in the pool queue (FIFO) and runs when a worker frees.
+        manager.submit(second)  # no 429, no exception
+        assert _status(factory, second) == "queued"  # waiting in the queue
+        planner.release.set()  # free the worker -> the queued scan runs
+        assert _wait_status(factory, first, ("completed", "failed")) == "completed"
+        assert _wait_status(factory, second, ("completed", "failed")) in (
+            "completed",
+            "failed",
+        )
+        assert manager.active_scan_ids() == []
     finally:
         planner.release.set()

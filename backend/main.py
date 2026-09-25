@@ -65,12 +65,29 @@ async def lifespan(app: FastAPI):
     try:
         from backend.services.scan_manager import get_scan_manager
 
-        recovered = get_scan_manager().recover()
-        if recovered["failed"] or recovered["cancelled"]:
+        manager = get_scan_manager()
+        recovered = manager.recover()
+        if any(recovered.values()):
             logger.info("scan recovery: %s", recovered)
     except Exception:
         logger.warning("database unavailable; skipping scan recovery")
-    yield
+    try:
+        yield
+    finally:
+        # Shutdown: stop accepting new scan work, cancel queued pool
+        # futures, let the app exit cleanly. Running workers are
+        # daemon-backed; interrupted scans are handled by startup
+        # recovery on the next boot. The in-memory cancellation registry
+        # is single-process only (documented deployment model).
+        try:
+            import backend.services.scan_manager as scan_manager_module
+
+            scan_manager_module.get_scan_manager().shutdown()
+            # The singleton holds per-process state (pool, cancellation
+            # registry); discard it so the next app creation starts fresh.
+            scan_manager_module._manager = None
+        except Exception:
+            logger.warning("scan manager shutdown skipped")
 
 
 def create_app() -> FastAPI:

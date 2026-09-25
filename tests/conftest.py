@@ -10,8 +10,9 @@ import pytest
 def reset_caches() -> None:
     """Clear cached settings/engines so per-test env changes take effect.
 
-    Covers agent_core settings and the backend settings/engine/session
-    caches (see backend/db/session.py).
+    Covers agent_core settings, the backend settings/engine/session
+    caches (see backend/db/session.py), and the ScanManager singleton
+    (its pool/registry hold per-process state).
     """
     from agent_core.config import get_settings
 
@@ -21,6 +22,10 @@ def reset_caches() -> None:
 
     db_session.get_engine.cache_clear()
     db_session.get_session_factory.cache_clear()
+
+    import backend.services.scan_manager as scan_manager_module
+
+    scan_manager_module._manager = None
 
     from backend.core.config import get_backend_settings
 

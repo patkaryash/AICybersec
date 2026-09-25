@@ -14,7 +14,32 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.db.models import AgentEvent, ToolRun, User
+from backend.services.result_persistence import sanitize_event_data
 from backend.services.scan_service import get_scan_for_user
+
+
+def record_event(
+    session: Session,
+    *,
+    scan_id: uuid.UUID,
+    event_type: str,
+    step: int | None = None,
+    data: dict | None = None,
+) -> None:
+    """Persist one lifecycle event to agent_events (sanitized payload).
+
+    Used by the ScanManager/executor for scan lifecycle events
+    (scan_started, scan_status_changed, terminal events); the runtime's
+    per-step events flow through the DatabaseEventSink instead.
+    """
+    session.add(
+        AgentEvent(
+            scan_id=scan_id,
+            event_type=str(event_type)[:50],
+            step=int(step) if isinstance(step, int) else None,
+            data=sanitize_event_data(data or {}),
+        )
+    )
 
 
 def list_agent_events_for_scan(
