@@ -46,5 +46,8 @@ packages = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q -m 'not lab_e2e'"
+markers = [
+    "lab_e2e: controlled-lab end-to-end scan (requires a running lab target and nmap; run explicitly with -m lab_e2e)",
+]
 pythonpath = ["."]

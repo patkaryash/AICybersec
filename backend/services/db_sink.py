@@ -36,6 +36,41 @@ logger = logging.getLogger(__name__)
 
 _FINISH_STATUS = {"ok": "completed", "error": "failed", "timeout": "timeout"}
 
+# Runtime (dot-notation) -> persisted (snake_case) event vocabulary.
+# The frozen external contract uses snake_case names (see frontend/
+# README.md); agent_core's internal vocabulary is unchanged - this is a
+# thin backend-side translation at persistence time.
+#
+# Skipped runtime events (persisted by the ScanManager instead, in the
+# right transaction and order): run.started/run.finished/run.failed
+# (scan lifecycle events are emitted by the executor as scan_started/
+# scan_status_changed/scan_completed/scan_failed/scan_cancelled) and
+# step.started (loop bookkeeping, no UI information).
+_EVENT_TRANSLATION = {
+    "run.started": None,
+    "run.finished": None,
+    "run.failed": None,
+    "step.started": None,
+    "tool.started": "tool_started",
+    "finding.recorded": "finding_created",
+}
+
+
+def _persisted_event_type(event_type: str, data: dict[str, Any]) -> str | None:
+    """Map a runtime event to its persisted (snake_case) type.
+
+    None means "do not persist" (owned by the ScanManager, or noise).
+    """
+    if event_type in _EVENT_TRANSLATION:
+        return _EVENT_TRANSLATION[event_type]
+    if event_type == "tool.finished":
+        return "tool_completed" if str(data.get("status", "")) == "ok" else "tool_failed"
+    if event_type == "decision.proposed":
+        return "agent_decision"
+    if event_type == "decision.rejected":
+        return "agent_observation"
+    return event_type
+
 
 class DatabaseEventSink:
     """EventSink writing agent events, tool runs and findings to Postgres."""
@@ -68,15 +103,17 @@ class DatabaseEventSink:
         event_type = str(event.get("type", ""))
         step = event.get("step")
         data = event.get("data") if isinstance(event.get("data"), dict) else {}
+        persisted_type = _persisted_event_type(event_type, data)
         with self._sessions() as session:
-            session.add(
-                AgentEvent(
-                    scan_id=self._scan_id,
-                    event_type=event_type,
-                    step=int(step) if isinstance(step, int) else None,
-                    data=sanitize_event_data(data),
+            if persisted_type is not None:
+                session.add(
+                    AgentEvent(
+                        scan_id=self._scan_id,
+                        event_type=persisted_type,
+                        step=int(step) if isinstance(step, int) else None,
+                        data=sanitize_event_data(data),
+                    )
                 )
-            )
             if event_type == "decision.proposed":
                 self._remember_proposal(event)
             elif event_type == "tool.started":
