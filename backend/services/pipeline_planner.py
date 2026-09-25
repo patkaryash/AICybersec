@@ -57,6 +57,30 @@ def _snapshot_hosts(snapshot: list[dict[str, Any]]) -> list[str]:
     return hosts
 
 
+def _snapshot_web_seeds(snapshot: list[dict[str, Any]]) -> list[str]:
+    """Explicit http(s) URLs from url scope entries, verbatim.
+
+    URL entries are the only scope entries that carry an authoritative
+    scheme/port. The web profile has no nmap stage, so without these
+    seeds it would fall back to ``http://<host>`` (port 80) and miss
+    services on non-standard ports entirely.
+    """
+    seeds: list[str] = []
+    for entry in snapshot or []:
+        if not isinstance(entry, dict) or entry.get("type") != "url":
+            continue
+        value = entry.get("value")
+        if (
+            isinstance(value, str)
+            and value.startswith(("http://", "https://"))
+            and value not in seeds
+        ):
+            seeds.append(value)
+        if len(seeds) >= MAX_STAGE_TARGETS:
+            break
+    return seeds
+
+
 def _nmap_http_urls(observations: list[Any]) -> list[str]:
     """http(s) URLs from nmap open ports (443 -> https, else http)."""
     urls: list[str] = []
@@ -161,9 +185,17 @@ class PipelinePlanner:
         if tool == "nmap":
             return list(self.hosts)
         if tool == "httpx":
-            return _nmap_http_urls(state.observations) or [f"http://{h}" for h in self.hosts]
+            return (
+                _nmap_http_urls(state.observations)
+                or _snapshot_web_seeds(self.snapshot)
+                or [f"http://{h}" for h in self.hosts]
+            )
         if tool == "nuclei":
-            return _httpx_urls(state.observations) or [f"http://{h}" for h in self.hosts]
+            return (
+                _httpx_urls(state.observations)
+                or _snapshot_web_seeds(self.snapshot)
+                or [f"http://{h}" for h in self.hosts]
+            )
         return []
 
     def decide(self, state: AgentState) -> Decision:

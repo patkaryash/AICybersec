@@ -34,7 +34,7 @@ def test_exact_argv_profile():
     argv = build_nuclei_argv(NucleiParams(targets=["https://demo.local", "https://demo.local:8443"]))
     assert argv[:4] == ["nuclei", "-jsonl", "-silent", "-nc"]
     assert argv[4:6] == ["-severity", "critical,high,medium"]
-    assert argv[6:8] == ["-tags", "cve,misconfiguration,exposure,default-login"]
+    assert argv[6:8] == ["-tags", "cve,misconfig,exposure,default-login"]
     for flag, value in (("-rate-limit", "150"), ("-bulk-size", "25"), ("-concurrency", "25"),
                       ("-timeout", "10"), ("-retries", "1")):
         assert flag in argv and value in argv
