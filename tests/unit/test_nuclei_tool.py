@@ -39,6 +39,9 @@ def test_exact_argv_profile():
                       ("-timeout", "10"), ("-retries", "1")):
         assert flag in argv and value in argv
     assert "-omit-raw" in argv
+    # -ni disables interactsh callbacks (lab diagnosis: their waits pushed
+    # full runs past the tool timeout).
+    assert "-ni" in argv
     assert argv[-4:] == ["-target", "https://demo.local", "-target", "https://demo.local:8443"]
     assert "-u" not in argv and "-oX" not in argv
     assert NucleiTool.danger_level == "active_scan"

@@ -36,6 +36,9 @@ def test_exact_argv_no_shell():
     for flag in ("-cl", "-ct", "-title", "-server", "-method", "-td", "-ip",
                  "-cname", "-cdn", "-tls-probe", "-follow-redirects"):
         assert flag in argv
+    # -duc disables the external version-update check (lab diagnosis:
+    # uncontrolled egress latency on every run).
+    assert "-duc" in argv
     assert argv[-4:] == ["-u", "https://demo.local", "-u", "https://demo.local:8443"]
     assert "-oX" not in argv and "|" not in " ".join(argv)
 

@@ -56,13 +56,16 @@ services:
 
   # Authorized, intentionally vulnerable lab target for development/E2E.
   # Never point scans at arbitrary Internet targets.
+  # NOTE: Juice Shop's Node heap OOM-crashes (exit 139) below 2 GB - it died
+  # within minutes at both 512 MB and 1 GB, even with zero scan load.
+  # 2 GB is the stable lab value. Do not lower this without re-verifying.
   juice-shop:
     image: bkimminich/juice-shop:latest
     profiles: ["lab"]
     ports:
       - "3000:3000"
     cpus: 1.0
-    mem_limit: 512m
+    mem_limit: 2g
 
 volumes:
   pgdata:
