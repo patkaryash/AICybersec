@@ -23,24 +23,63 @@ import { useAgentSimulation } from '../hooks/useAgentSimulation';
 import { Card } from '../components/common/Card';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { DemoBanner } from '../components/common/DemoBanner';
-import { SCAN_PROFILES } from '../types/scan';
+import { SCAN_PROFILES, Scan } from '../types/scan';
 import { eventService } from '../services/api/eventService';
+import { scanService as realScanService } from '../services/api/scanService';
+import { mapScanOutToScan, mapRealEventsToTimeline } from '../services/adapters';
 import { AgentTimelineEvent } from '../types/agent';
 
 export const LiveAgentPage: React.FC = () => {
   const { scanId } = useParams<{ scanId: string }>();
   const navigate = useNavigate();
-  const { scans, stopScan, isDemo } = useScans();
+  const { scans, stopScan, refreshData, isDemo } = useScans();
 
   const [copiedId, setCopiedId] = useState(false);
   const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
   const [realEvents, setRealEvents] = useState<AgentTimelineEvent[]>([]);
 
-  // Find targeted scan, or fallback to first running/available scan
-  const scan =
+  // Context snapshot (loaded once per refreshData call) + live override.
+  const contextScan =
     scans.find((s) => s.id === scanId) ||
     scans.find((s) => s.status === 'running' || s.status === 'queued') ||
     scans[0];
+
+  // Live status polling: the context list does not refresh on its own, so
+  // without this the header would stay "Running" (and findings at 0) after
+  // the run finishes server-side. Polls until a terminal status, then
+  // syncs the context lists once.
+  const [liveScan, setLiveScan] = useState<Scan | undefined>(undefined);
+  useEffect(() => {
+    if (!scanId || isDemo) return;
+    let cancelled = false;
+    let interval: number | undefined;
+    const poll = async () => {
+      try {
+        const mapped = mapScanOutToScan(await realScanService.getScan(scanId));
+        if (cancelled) return;
+        setLiveScan(mapped);
+        if (
+          mapped.status === 'completed' ||
+          mapped.status === 'failed' ||
+          mapped.status === 'cancelled' ||
+          mapped.status === 'finished'
+        ) {
+          if (interval !== undefined) window.clearInterval(interval);
+          await refreshData();
+        }
+      } catch {
+        // Transient error: retry on the next tick.
+      }
+    };
+    poll();
+    interval = window.setInterval(poll, 5000);
+    return () => {
+      cancelled = true;
+      if (interval !== undefined) window.clearInterval(interval);
+    };
+  }, [scanId, isDemo, refreshData]);
+
+  const scan = liveScan ?? contextScan;
 
   const profileInfo = scan ? SCAN_PROFILES[scan.profile] : null;
 
@@ -70,17 +109,7 @@ export const LiveAgentPage: React.FC = () => {
       try {
         const rawEvents = await eventService.listAgentEvents(scan.id, 0, 50);
         if (isMounted) {
-          const mapped: AgentTimelineEvent[] = rawEvents.map((e) => ({
-            id: String(e.seq),
-            step: e.step ?? 1,
-            type: e.event_type as AgentTimelineEvent['type'],
-            timestamp: e.created_at,
-            title: e.event_type.replace(/_/g, ' ').toUpperCase(),
-            description: JSON.stringify(e.data),
-            status: 'completed',
-            payload: e.data,
-          }));
-          setRealEvents(mapped);
+          setRealEvents(mapRealEventsToTimeline(rawEvents));
         }
       } catch (err) {
         console.warn('Real agent events polling error:', err);
@@ -93,7 +122,7 @@ export const LiveAgentPage: React.FC = () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [scan, isSimulated]);
+  }, [scan?.id, isSimulated]);
 
   const events = isSimulated ? simulatedEvents : realEvents;
 
@@ -102,6 +131,18 @@ export const LiveAgentPage: React.FC = () => {
     navigator.clipboard.writeText(scan.id);
     setCopiedId(true);
     setTimeout(() => setCopiedId(false), 2000);
+  };
+
+  const handleCancel = async () => {
+    if (!scan) return;
+    try {
+      await stopScan(scan.id);
+    } catch {
+      // Already terminal server-side (cancel rejects on finished scans):
+      // fall through and re-sync so the header stops saying "Running".
+    }
+    await refreshData();
+    setLiveScan(undefined);
   };
 
   const toggleEventExpand = (id: string) => {
@@ -213,7 +254,7 @@ export const LiveAgentPage: React.FC = () => {
 
               {isCancellable && (
                 <button
-                  onClick={() => stopScan(scan.id)}
+                  onClick={handleCancel}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-rose-800/80 bg-rose-950/40 text-rose-300 hover:bg-rose-900/50 text-xs font-medium transition-colors"
                 >
                   <Ban size={14} />

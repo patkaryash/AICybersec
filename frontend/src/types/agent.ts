@@ -1,6 +1,7 @@
 import { Finding } from './finding';
 
 export type AgentEventType =
+  // Phase-3 dot-notation vocabulary (pre-#14 backends)
   | 'run.started'
   | 'step.started'
   | 'decision.proposed'
@@ -9,7 +10,19 @@ export type AgentEventType =
   | 'tool.finished'
   | 'finding.recorded'
   | 'run.finished'
-  | 'run.failed';
+  | 'run.failed'
+  // Frozen snake_case vocabulary (PR #14+)
+  | 'scan_started'
+  | 'scan_status_changed'
+  | 'scan_completed'
+  | 'scan_failed'
+  | 'scan_cancelled'
+  | 'tool_started'
+  | 'tool_completed'
+  | 'tool_failed'
+  | 'agent_decision'
+  | 'agent_observation'
+  | 'finding_created';
 
 export interface AgentTimelineEvent {
   id: string;
