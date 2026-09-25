@@ -101,18 +101,19 @@ Create request:
 
 - `profile` is `recon | web | full`; `mode` is `pipeline | agent`.
 - `tool_timeout_s` is 30..1800 (default 300).
-- **Phase 2 semantics:** creation authenticates you, authorizes the
+- **Phase 3 semantics:** creation authenticates you, authorizes the
   project, snapshots the project scope into `target_snapshot` and
-  persists the scan with `status: "queued"`. **No execution is
-  scheduled yet** — Phase 3 adds background execution; until then scans
-  stay `queued` (you may cancel them).
+  persists the scan with `status: "queued"`, then submits it to the
+  ScanManager for background execution (unless `AICYBERSEC_SCAN_AUTO_START=0`).
+  The request returns 202 immediately without waiting. Poll
+  `GET /api/v1/scans/{id}` and the events endpoints below for progress.
 - Scan status vocabulary (seven states): `queued`, `initializing`,
   `running`, `cancelling`, `completed`, `failed`, `cancelled`.
   Cancel works on `queued`/`initializing`; other states → 409.
 - A project can have at most **one active scan** (`queued`/`initializing`/
   `running`/`cancelling`) — a second one returns 409.
 - `ScanOut` includes `total_steps` (static per profile: recon=2, web=2,
-  full=3), `current_step` (0 until Phase 3 execution), and
+  full=3), `current_step` (advances as the pipeline executes), and
   `findings_count {critical, high, medium, low, info, total}`.
 
 ## 4. Findings / Assets / Agent events / Tool runs (read APIs)
@@ -126,8 +127,9 @@ Create request:
 | `GET /api/v1/scans/{scan_id}/agent-events?after_id&limit` | **cursor** pagination: pass the last `seq` you have seen; `after_id=0` replays the full history; `limit` 1..100 (default 50) |
 | `GET /api/v1/scans/{scan_id}/tool-runs?page&page_size` | paginated, oldest first |
 
-Until Phase 3 executes tools, scans created now have **empty** lists for
-all four resources — that is expected, not a bug.
+Executing scans fill all four resources as tools run; a freshly queued
+scan legitimately shows empty lists until its pipeline starts producing
+observations.
 
 **Finding separation:** scanner fields (`scanner_severity`,
 `scanner_evidence`, `scanner_references`, `source_tool`) are tool

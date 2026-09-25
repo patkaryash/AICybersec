@@ -1,7 +1,8 @@
 """Scans API: thin routers over backend/services/scan_service.py.
 
-Phase 2: creation persists a queued record and returns 202 - no
-execution is scheduled (Phase 3 adds the ScanManager).
+Phase 3: creation persists a queued record, returns 202, and submits
+the scan to the ScanManager for background execution (unless disabled
+via AICYBERSEC_SCAN_AUTO_START=0). The request never waits for the run.
 """
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ from backend.db.models import User
 from backend.db.session import get_db
 from backend.schemas.scans import ScanCreate, ScanOut, ScanStatus
 from backend.services import scan_service
+from backend.services.scan_manager import get_scan_manager
 
 router = APIRouter(prefix="/api/v1/scans", tags=["scans"])
 
@@ -31,7 +33,12 @@ def create_scan(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_db),
 ) -> Envelope[ScanOut]:
+    from backend.core.config import get_backend_settings
+
     scan = scan_service.create_scan(session, user=user, data=body)
+    if get_backend_settings().scan_auto_start:
+        get_scan_manager().submit(scan.id)
+        session.refresh(scan)
     return ok(scan_service.scan_out(scan), _request_id(request))
 
 

@@ -62,6 +62,14 @@ async def lifespan(app: FastAPI):
         _seed_admin()
     except Exception:
         logger.warning("database unavailable; skipping admin seed")
+    try:
+        from backend.services.scan_manager import get_scan_manager
+
+        recovered = get_scan_manager().recover()
+        if recovered["failed"] or recovered["cancelled"]:
+            logger.info("scan recovery: %s", recovered)
+    except Exception:
+        logger.warning("database unavailable; skipping scan recovery")
     yield
 
 

@@ -1,9 +1,9 @@
 """Scan DTOs.
 
-Phase 2: POST /scans creates and persists the record with
-status="queued" and returns 202 - no execution is scheduled (Phase 3).
-target_snapshot is the authorization anchor: a copy of the project's
-validated scope at scan creation.
+Phase 3: POST /scans creates and persists the record with
+status="queued", returns 202, and submits it to the ScanManager for
+background execution. target_snapshot is the authorization anchor: a
+copy of the project's validated scope at scan creation.
 """
 from __future__ import annotations
 
@@ -29,7 +29,9 @@ ScanProfile = Literal["recon", "web", "full"]
 # the tool sequence lengths are fixed by the profiles).
 PROFILE_TOTAL_STEPS: dict[str, int] = {"recon": 2, "web": 2, "full": 3}
 
-CANCELLABLE_STATUSES = ("queued", "initializing")
+# queued/initializing cancel directly; running cancels cooperatively via
+# the ScanManager signal (Phase 3). Terminal states are never cancellable.
+CANCELLABLE_STATUSES = ("queued", "initializing", "running")
 
 
 class ScanCreate(BaseModel):

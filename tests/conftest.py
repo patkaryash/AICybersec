@@ -90,6 +90,10 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """
     monkeypatch.setenv("AICYBERSEC_RUNS_DIR", str(tmp_path / "runs"))
     monkeypatch.setenv("AICYBERSEC_ADMIN_EMAIL", "")
+    # Phase 3: scans must NOT auto-execute in the shared fixtures -
+    # background workers would make count/status assertions racy.
+    # Execution tests opt in explicitly (own fixture or direct submit).
+    monkeypatch.setenv("AICYBERSEC_SCAN_AUTO_START", "0")
     for var in _MODEL_ENV_VARS:
         monkeypatch.delenv(var, raising=False)
     from agent_core.config import get_settings
@@ -123,6 +127,7 @@ def client_seeded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, clean_db):
     monkeypatch.setenv("AICYBERSEC_RUNS_DIR", str(tmp_path / "runs"))
     monkeypatch.setenv("AICYBERSEC_ADMIN_EMAIL", "admin@aicybersec.dev")
     monkeypatch.setenv("AICYBERSEC_ADMIN_PASSWORD", "admin-dev-password-change-me")
+    monkeypatch.setenv("AICYBERSEC_SCAN_AUTO_START", "0")
     for var in _MODEL_ENV_VARS:
         monkeypatch.delenv(var, raising=False)
     from agent_core.config import get_settings

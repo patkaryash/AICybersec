@@ -40,11 +40,22 @@ def list_agent_events(
     rows = event_service.list_agent_events_for_scan(
         session, user=user, scan_id=scan_id, after_id=after_id, limit=limit
     )
+    # seq is the row id (the ordered cursor); mapped explicitly because
+    # the ORM primary key is named id, not seq.
+    items = [
+        AgentEventOut(
+            seq=e.id,
+            scan_id=e.scan_id,
+            event_type=e.event_type,
+            step=e.step,
+            data=e.data,
+            created_at=e.created_at,
+        )
+        for e in rows
+    ]
     return Envelope[PageData[AgentEventOut]](
         success=True,
-        data=PageData[AgentEventOut](
-            items=[AgentEventOut.model_validate(e, from_attributes=True) for e in rows]
-        ),
+        data=PageData[AgentEventOut](items=items),
         meta=Meta(
             request_id=_request_id(request), page_size=limit
         ),
