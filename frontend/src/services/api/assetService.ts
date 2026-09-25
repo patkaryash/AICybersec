@@ -1,5 +1,5 @@
 /**
- * Assets Service for Sentinel AI backend (/api/v1/scans/{id}/assets & /assets/{id})
+ * Assets Service for CyberSec AI backend (/api/v1/scans/{id}/assets & /assets/{id})
  */
 
 import { apiClient } from '../apiClient';

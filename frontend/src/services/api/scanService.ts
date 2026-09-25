@@ -1,5 +1,5 @@
 /**
- * Scans Service for Sentinel AI backend (/api/v1/scans)
+ * Scans Service for CyberSec AI backend (/api/v1/scans)
  */
 
 import { apiClient } from '../apiClient';

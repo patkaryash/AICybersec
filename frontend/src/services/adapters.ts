@@ -1,5 +1,5 @@
 /**
- * Sentinel AI — Domain Model Adapters
+ * CyberSec AI — Domain Model Adapters
  * Safely maps backend v1 DTOs to frontend presentation models.
  */
 

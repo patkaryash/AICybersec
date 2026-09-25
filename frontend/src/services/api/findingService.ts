@@ -1,5 +1,5 @@
 /**
- * Findings Service for Sentinel AI backend (/api/v1/scans/{id}/findings & /findings/{id})
+ * Findings Service for CyberSec AI backend (/api/v1/scans/{id}/findings & /findings/{id})
  */
 
 import { apiClient } from '../apiClient';

@@ -1,5 +1,5 @@
 /**
- * Authentication Service for Sentinel AI backend (/api/v1/auth)
+ * Authentication Service for CyberSec AI backend (/api/v1/auth)
  */
 
 import { apiClient } from '../apiClient';

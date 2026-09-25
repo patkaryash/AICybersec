@@ -1,5 +1,5 @@
 /**
- * Dashboard Service for Sentinel AI backend (/api/v1/dashboard)
+ * Dashboard Service for CyberSec AI backend (/api/v1/dashboard)
  */
 
 import { apiClient } from '../apiClient';

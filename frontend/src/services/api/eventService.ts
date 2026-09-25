@@ -1,5 +1,5 @@
 /**
- * Events Service for Sentinel AI backend (/api/v1/scans/{id}/agent-events & /tool-runs)
+ * Events Service for CyberSec AI backend (/api/v1/scans/{id}/agent-events & /tool-runs)
  */
 
 import { apiClient } from '../apiClient';

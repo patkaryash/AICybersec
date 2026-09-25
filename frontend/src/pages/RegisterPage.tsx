@@ -76,7 +76,7 @@ export const RegisterPage: React.FC = () => {
           </div>
           <div className="flex items-center justify-center gap-1.5">
             <h1 className="text-2xl font-bold tracking-tight text-sentinel-text">
-              Sentinel <span className="text-sentinel-cyan">AI</span>
+              CyberSec <span className="text-sentinel-cyan">AI</span>
             </h1>
             <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold bg-cyan-950/80 text-sentinel-cyan border border-cyan-800/60">
               Registration

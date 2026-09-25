@@ -1,5 +1,5 @@
 /**
- * Project Service for Sentinel AI backend (/api/v1/projects)
+ * Project Service for CyberSec AI backend (/api/v1/projects)
  */
 
 import { apiClient } from '../apiClient';
