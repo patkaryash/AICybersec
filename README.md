@@ -1,47 +1,64 @@
 # AICybersec
 
-AI-assisted penetration-testing platform (academic major project). This
-repository currently contains the **agent foundation**: a modular,
-mock-first agent core that runs entirely offline, plus a minimal FastAPI
-backend exposing it over HTTP/SSE.
+AI-assisted penetration-testing platform (academic major project), built
+for **authorized testing in controlled lab environments only**. The
+repository now contains a working end-to-end system:
 
-> **Status:** foundation + three real tools (nmap, httpx, nuclei) + model
-> planner. No external LLM wired by default, no exploitation, no browser
-> automation, no model training yet. Mock tools and MockModelProvider still
-> work; real tools run as controlled subprocesses against allowlisted
-> targets only.
+- **agent_core** — pure agent library: planner → decision → two-stage
+  safety validation → controlled subprocess tools (nmap, httpx, nuclei).
+- **FastAPI backend** — JWT auth, projects with target scope, background
+  scan execution (ScanManager), findings/assets/events persistence in
+  PostgreSQL, everything under `/api/v1`.
+- **React + Vite frontend** — login/register, projects, scan execution
+  with a live agent-event feed, findings dashboard.
+
+> **Status (Phase 3 complete):** a scan started from the browser runs a
+> real, safety-gated pipeline — nmap → httpx → nuclei — against an
+> allowlisted local lab target (OWASP Juice Shop) and persists findings,
+> assets and agent events to PostgreSQL. No external LLM is required;
+> exploitation, browser automation and model training are future phases.
 
 ## Architecture (text diagram)
 
 ```
-Frontend (separate, not built yet)
-        |  REST + SSE
+React frontend (frontend/, Vite dev server :5173)
+        |  REST, JWT Bearer, all under /api/v1
         v
-FastAPI backend  (backend/)          <- HTTP only, composition root
-        |  in-process
-        v
-AgentRuntime (agent_core/runtime)    <- decide -> validate -> execute loop
+FastAPI backend (backend/)            <- HTTP only, composition root
+   |  auth / projects / scans / findings / assets / events / dashboard
+   v
+ScanManager (backend/services/)       <- one background task per scan,
+   |  status: queued -> initializing -> running -> terminal;
+   |  cancellation support; max one active scan per project
+   v
+AgentRuntime (agent_core/runtime)     <- decide -> validate -> execute loop
    |          \__________________
    v                             v
 Planner                    SafetyValidator
-(scripted now,             (schema stage + policy stage)
- model-backed later)             |
-   |                             v
-   |  Decision (tool_call|finish, JSON)  ->  ToolRegistry (whitelist)
-   |                                             |
-   v                                             v
-ModelProvider (protocol,                Tool.execute(validated params)
- mock now; your trained                          |
- model later plugs in here)                      v
-                                           ToolResult -> Observation
-                                                 |
-                                                 v
-                                    AgentState (persisted state.json)
-                                    Trajectory (trajectory.jsonl)
-                                    Events -> SSE -> Frontend
+(pipeline planner; the     (schema stage + policy stage: target
+ model planner exists but   allowlist, danger cap, max steps)
+ external LLMs stay off by default)
+   |                             |
+   |  Decision (tool_call|finish) ->  ToolRegistry (whitelist)
+   v                                   |
+ModelProvider (mock by default)        v
+                                 Tool.execute(validated params)
+                                 nmap | httpx | nuclei   (fixed argv,
+                                 pinned binaries, XML/JSONL stdout)
+                                       |
+                                       v
+                            ToolResult -> Observation
+                                       |
+            +--------------------------+--------------------------+
+            v                          v                          v
+   ScanRecord (PostgreSQL)    Findings + Assets +        AgentEvents +
+                              ToolRuns (PostgreSQL)      ToolRuns events
+                              (served via REST)          (persisted, served
+                                                          via REST polling)
 ```
 
-See `docs/architecture.md` for the detailed boundary rationale.
+See `docs/architecture.md` for the detailed boundary and safety-model
+rationale.
 
 ## Repository structure
 
@@ -49,18 +66,204 @@ See `docs/architecture.md` for the detailed boundary rationale.
 agent_core/     Pure agent library. No FastAPI, no HTTP, no shell tool.
   schemas/      Shared contracts (Decision, ToolSpec, Finding, AgentState...)
   providers/    ModelProvider protocol + mock (future model plugs in here)
-  planner/      Planner protocol + ScriptedPlanner (deterministic demo)
+  planner/      Planner protocol + ScriptedPlanner / ModelPlanner
   tools/        Tool ABC, ToolContext, ToolRegistry, mock tools,
-                subprocess.py (pinned-binary runner), nmap.py + nmap_parser.py
+                subprocess.py (pinned-binary runner),
+                nmap.py, httpx.py, nuclei.py + parsers
   safety/       Policy + two-stage SafetyValidator
   runtime/      AgentRuntime loop + event system
   state/        JsonFileStore (state.json + trajectory.jsonl)
-backend/        FastAPI adapter: deps.py (composition root), routes/, SSE
-frontend/       NOT built yet - README documents the API/event contract
-tests/          unit / integration / contracts / api (all offline)
+backend/        FastAPI adapter: api/ (routes), services/ (ScanManager,
+                pipeline planner, persistence), core/ (config, errors),
+                schemas/, db/ (SQLAlchemy models + Alembic migrations)
+frontend/       React + Vite app (login, projects, scans, findings, events)
+docker/         docker-compose.yml (postgres + backend + Juice Shop lab target)
+tests/          unit / integration / contracts / api (offline except DB tests)
 docs/           architecture.md
 runs/           gitignored runtime output (state.json, trajectory.jsonl)
 ```
+
+## Quick start (Docker, recommended)
+
+Prerequisite: Docker Desktop (or any Docker Engine with Compose v2).
+
+```bash
+# from the repository root
+docker compose -f docker/docker-compose.yml up -d                 # postgres + backend
+docker compose -f docker/docker-compose.yml --profile lab up -d   # + Juice Shop lab target
+```
+
+| Service | URL | Notes |
+|---|---|---|
+| Backend API | http://localhost:8000 | runs Alembic migrations, then uvicorn |
+| API docs (Swagger) | http://localhost:8000/api/v1/docs | ReDoc: `/api/v1/redoc` |
+| PostgreSQL | localhost:5432 | user/db/password `aicybersec` (dev default) |
+| Juice Shop (lab) | http://localhost:3000 | only with `--profile lab`; give it memory headroom (see the note in `docker/docker-compose.yml`) |
+
+The backend seeds a default admin at startup (dev defaults live in
+`docker/docker-compose.yml` / `.env.example`):
+`admin@aicybersec.dev` / `admin-dev-password-change-me`. Change these in
+any shared environment.
+
+## Frontend (dev server)
+
+```bash
+cd frontend
+npm install
+npm run dev          # http://localhost:5173
+```
+
+CORS for `localhost:5173` is pre-configured in the compose file. The UI
+talks to the backend at `http://localhost:8000`; the frozen v1 API
+contract is documented in `frontend/README.md`.
+
+## Local (non-Docker) backend
+
+```bash
+python -m venv .venv
+source .venv/Scripts/activate        # Windows (bash)  |  Linux: .venv/bin/activate
+pip install -e ".[dev]"
+
+cp .env.example .env                 # adjust values; NEVER commit .env
+alembic upgrade head
+uvicorn backend.main:app --reload    # http://localhost:8000
+```
+
+Configuration is environment-driven (`AICYBERSEC_` prefix, loaded from
+`.env`). See `.env.example` for the full list: database URL, JWT
+secret/expiry, admin seed credentials, CORS origins, concurrency and
+timeout limits, `AICYBERSEC_SCAN_AUTO_START` (set `0` to keep scans
+queued instead of auto-starting them), runs directory, AI provider
+settings.
+
+## Authentication (JWT Bearer)
+
+Every endpoint except `/api/v1/health*`, `register` and `login` requires
+`Authorization: Bearer <token>`.
+
+```bash
+python - <<'PY'
+import json, urllib.request
+
+def request(path, body=None, token=None):
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request("http://localhost:8000" + path,
+                                 data=data, headers=headers,
+                                 method="POST" if body is not None else "GET")
+    return json.load(urllib.request.urlopen(req))
+
+request("/api/v1/auth/register",
+        {"email": "student@example.com", "password": "password123"})
+tok = request("/api/v1/auth/login",
+              {"email": "student@example.com",
+               "password": "password123"})["data"]["access_token"]
+print(request("/api/v1/auth/me", token=tok))
+PY
+```
+
+- `POST /api/v1/auth/register` → **201** (duplicate email → 409; role is
+  always `user`, clients cannot create admins)
+- `POST /api/v1/auth/login` → `{access_token, token_type, expires_in}`
+  (wrong credentials → generic 401)
+- `GET /api/v1/auth/me` → current user
+
+Every response uses the envelope
+`{success, data, error, meta.request_id}`; error codes map to HTTP
+401 (credentials) / 404 (not found **or** not owned) / 409 (conflict) /
+422 (validation).
+
+## Projects and target scope
+
+Scans never accept free-form targets — they scan the **scope** of a
+project you own. Create a project first (via the UI or the API):
+
+```json
+POST /api/v1/projects
+{
+  "name": "Juice Shop lab",
+  "description": "Authorized local lab target",
+  "scope": [
+    {"type": "host", "value": "juice-shop"},
+    {"type": "host", "value": "172.18.0.3"},
+    {"type": "url",  "value": "http://juice-shop:3000"}
+  ]
+}
+```
+
+- `scope.type` is `host | cidr | url`; at least one entry is required;
+  values are validated and canonicalized (otherwise 422
+  `INVALID_TARGET`).
+- The scope is snapshotted into the scan at creation time
+  (`target_snapshot`) and enforced by the SafetyValidator on **every**
+  tool call — tools cannot widen it.
+- List/read/update/archive: `GET|PATCH|DELETE /api/v1/projects[...]`
+  (delete is an archive, never a physical delete). You only ever see
+  your own projects.
+
+Lab note: inside the compose network the `juice-shop` hostname resolves
+to the container IP. Scans may derive URL targets such as
+`http://juice-shop:3000`; the validator compares the **derived** host,
+so include the container IP as a `host` scope entry too (as above) —
+otherwise the derived target is rejected fail-closed.
+
+## Running a scan
+
+```json
+POST /api/v1/scans          -> 202 Accepted, returns immediately
+{ "project_id": "<uuid>", "profile": "full", "mode": "pipeline" }
+```
+
+- `profile` is `recon | web | full`; `mode` is `pipeline | agent`.
+- Status vocabulary: `queued → initializing → running → (cancelling) →
+  completed | failed | cancelled`.
+- The scan executes in the background (ScanManager). Poll
+  `GET /api/v1/scans/{id}` and the read endpoints:
+  - `GET /api/v1/scans/{id}/findings?severity&status`
+  - `GET /api/v1/scans/{id}/assets?asset_type`
+  - `GET /api/v1/scans/{id}/agent-events?after_id&limit` (cursor
+    pagination: pass the last `seq`; `after_id=0` replays history)
+  - `GET /api/v1/scans/{id}/tool-runs`
+- `POST /api/v1/scans/{id}/cancel` → **202** (works while
+  `queued`/`initializing`/`running`; later → 409)
+- One active scan per project; a second → 409 `SCAN_ALREADY_RUNNING`.
+- `GET /api/v1/dashboard` → aggregated counts + recent scans.
+
+Phase 3 pipeline profiles:
+
+| Profile | Steps |
+|---|---|
+| `recon` | nmap → httpx |
+| `web` | httpx → nuclei |
+| `full` | nmap → httpx → nuclei |
+
+Each step is a `Decision → SafetyValidator → ToolRegistry → Tool`
+round-trip. nmap/httpx are reconnaissance (`danger_level=safe`); nuclei
+is template-based vulnerability scanning (`danger_level=active_scan`,
+`cve,misconfiguration,exposure,default-login` tags, medium+ severity).
+Tools run as pinned binaries with fixed argv (no shell, no arbitrary
+flags); raw tool output never enters model context or event payloads.
+
+## Demo script (~5 minutes, fully offline)
+
+1. Start the stack (Quick start) and open http://localhost:5173.
+2. Register a user — or log in as the seeded admin.
+3. Create the "Juice Shop lab" project with the 3-entry scope above.
+4. Start a `recon` scan (~15–20 s): assets appear as nmap → httpx
+   complete, and the live agent-event feed streams decisions and tool
+   results.
+5. Start a `full` scan; while httpx runs, hit **Cancel** — status moves
+   `cancelling → cancelled` within seconds.
+6. Open a completed Nuclei scan from Scan History: findings by severity,
+   per-finding evidence, tool-run list.
+7. Safety beat: a rejected decision in the agent events
+   (`decision.rejected`) shows the model proposing and the validator
+   refusing — the model proposes, safety disposes.
+
+Everything stays on the lab network: the only allowed target is the
+Juice Shop container.
 
 ## Nmap (M1 - first real tool)
 
@@ -186,56 +389,24 @@ proposal is rejected, never executed), and the existing `max_steps` guard
 stops a planner that never finishes. This is an architecture evaluation,
 not an autonomous production deployment.
 
-## Setup
-
-```bash
-python -m venv .venv
-source .venv/Scripts/activate      # Windows (bash)  |  Linux: .venv/bin/activate
-pip install -e ".[dev]"
-```
-
-Python 3.11+. No API keys, no environment variables required.
-
-## Run the demo (no LLM, no network)
-
-```bash
-python -m agent_core --target demo.local
-python -m agent_core --target demo.local --list-tools   # print ToolSpecs
-python -m agent_core --goal "custom goal" --target demo.local --max-steps 6
-```
-
-You will see: goal -> tool call -> validation -> mock tool -> findings ->
-second tool -> finish, plus `runs/<run_id>/state.json` and
-`runs/<run_id>/trajectory.jsonl`.
-
 ## Run tests
 
 ```bash
 python -m pytest
 ```
 
-All tests are offline: no API keys, no network, no real security tools.
-
-## Start the backend
-
-```bash
-uvicorn backend.main:app --reload
-# then:
-#   curl -X POST localhost:8000/runs -H "Content-Type: application/json" \
-#        -d '{"goal": "recon", "targets": ["demo.local"]}'
-#   curl localhost:8000/runs/<run_id>
-#   curl -N localhost:8000/runs/<run_id>/events
-# interactive docs: http://localhost:8000/docs
-```
-
-The API works without an LLM: the backend wires the scripted planner and
-mock tools (see `backend/deps.py`).
+- Unit/contract tests are fully offline: no API keys, no network, no real
+  security tools.
+- API/integration tests need a PostgreSQL (the compose `postgres` service
+  is enough): with it up the full suite passes (~340 tests, 1
+  environment-gated skip); without it, those tests skip automatically.
 
 ## Development workflow
 
 - See `CONTRIBUTING.md` for branch/PR rules and ownership boundaries.
 - Shared contracts live in `agent_core/schemas/` - all three components
   depend on them; change carefully and with tests.
+- The frozen v1 frontend/API contract is documented in `frontend/README.md`.
 - Adding a new tool = one new file implementing `Tool` + one registration
   line in the composition root + a contract test. No core changes.
 
