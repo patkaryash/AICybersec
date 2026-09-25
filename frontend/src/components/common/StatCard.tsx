@@ -44,27 +44,34 @@ export const StatCard: React.FC<StatCardProps> = ({
     },
   }[accentColor];
 
+  const badgeStyles = {
+    default: 'border-sentinel-border bg-sentinel-elevated text-sentinel-muted',
+    success: 'border-emerald-800/60 bg-emerald-950/50 text-emerald-300',
+    warning: 'border-amber-800/60 bg-amber-950/50 text-amber-300',
+    danger: 'border-rose-800/60 bg-rose-950/50 text-rose-300',
+  }[(badge?.variant ?? 'default') as 'default' | 'success' | 'warning' | 'danger'];
+
   return (
     <div
-      className={`bg-sentinel-surface border border-sentinel-border rounded-xl p-5 shadow-sm transition-all duration-200 ${accentStyles.borderHover} flex flex-col justify-between`}
+      className={`bg-sentinel-surface border border-sentinel-border rounded-xl p-5 shadow-sm transition-all duration-200 ${accentStyles.borderHover} hover:shadow-md hover:-translate-y-px flex flex-col justify-between`}
     >
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wider text-sentinel-muted">{title}</span>
-        <div className={`p-2.5 rounded-lg border ${accentStyles.iconBg}`}>
-          <Icon size={18} aria-hidden="true" />
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-sentinel-muted">{title}</span>
+        <div className={`p-2.5 rounded-xl border ${accentStyles.iconBg}`}>
+          <Icon size={17} aria-hidden="true" />
         </div>
       </div>
 
-      <div className="mt-4 flex items-baseline justify-between">
-        <span className="text-3xl font-bold tracking-tight text-sentinel-text font-mono">{value}</span>
+      <div className="mt-4 flex items-baseline justify-between gap-2">
+        <span className="text-[32px] leading-none font-bold tracking-tight tabular-nums text-sentinel-text">{value}</span>
         {badge && (
-          <span className="text-xs font-medium px-2 py-0.5 rounded border border-sentinel-border bg-sentinel-elevated text-sentinel-muted">
+          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${badgeStyles}`}>
             {badge.text}
           </span>
         )}
       </div>
 
-      {subtitle && <p className="text-xs text-sentinel-dim mt-1.5">{subtitle}</p>}
+      {subtitle && <p className="text-xs text-sentinel-dim mt-2">{subtitle}</p>}
     </div>
   );
 };

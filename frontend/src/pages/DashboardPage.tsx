@@ -22,7 +22,7 @@ import ThreatGlobe from '../components/common/ThreatGlobe';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { scans, findings, severityStats, loading, error, refreshData } = useScans();
+  const { scans, severityStats, loading, error, refreshData } = useScans();
 
   const activeScans = scans.filter(
     (s) => s.status === 'running' || s.status === 'queued' || s.status === 'initializing'
@@ -64,36 +64,38 @@ export const DashboardPage: React.FC = () => {
       )}
 
       {/* Top Hero / Welcome Banner with Integrated Threat Globe */}
-      <div className="relative overflow-hidden rounded-xl border border-sentinel-border bg-gradient-to-r from-sentinel-surface via-[#131C2E] to-sentinel-surface p-6 shadow-md">
-        <div className="flex flex-col lg:flex-row gap-6 items-center">
+      <div className="relative overflow-hidden rounded-2xl border border-sentinel-border/80 bg-gradient-to-br from-sentinel-surface via-[#111A2C] to-[#0C1B26] p-6 sm:p-8 shadow-xl shadow-black/30 ring-1 ring-white/5">
+        <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-cyan-500/10 blur-[100px]" />
+        <div className="pointer-events-none absolute -bottom-32 right-1/4 h-72 w-72 rounded-full bg-purple-600/10 blur-[100px]" />
+        <div className="relative flex flex-col lg:flex-row gap-6 items-center">
           {/* Left Side: Text and Buttons */}
-          <div className="flex-1 space-y-2 w-full">
-            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 text-xs font-mono font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+          <div className="flex-1 space-y-3 w-full">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 text-[11px] font-mono font-medium tracking-widest uppercase">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
               Autonomous AI Security Engine
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-sentinel-text">
+            <h2 className="text-2xl sm:text-[28px] font-bold tracking-tight text-sentinel-text text-balance">
               Continuous AI-Assisted Penetration Testing
             </h2>
-            <p className="text-xs sm:text-sm text-sentinel-muted leading-relaxed">
-              Execute targeted reconnaissance, identify high-impact vulnerabilities with automated LLM reasoning,
-              and review verified findings with actionable remediation code.
+            <p className="text-xs sm:text-sm text-sentinel-muted leading-relaxed max-w-xl">
+              Execute targeted reconnaissance, identify high-impact vulnerabilities with an autonomous
+              scan pipeline, and review verified findings with actionable remediation guidance.
             </p>
 
-            <div className="mt-5 flex flex-wrap items-center gap-3">
+            <div className="pt-2 flex flex-wrap items-center gap-3">
               <button
                 onClick={() => navigate('/new-scan')}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-sentinel-cyan text-sentinel-bg font-semibold text-xs tracking-wide hover:bg-sentinel-cyan-hover transition-colors shadow-sm"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-sentinel-cyan text-sentinel-bg font-semibold text-xs tracking-wide hover:bg-sentinel-cyan-hover transition-all shadow-lg shadow-cyan-950/40 hover:shadow-cyan-900/40 hover:-translate-y-px"
               >
                 <ShieldPlus size={16} />
                 <span>Start New Pentest</span>
               </button>
               <button
                 onClick={() => navigate('/findings')}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-sentinel-elevated border border-sentinel-border text-sentinel-text font-medium text-xs hover:bg-sentinel-subtle transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-sentinel-border text-sentinel-text font-medium text-xs hover:bg-white/10 hover:border-sentinel-border-light transition-all"
               >
                 <Bug size={15} className="text-sentinel-cyan" />
-                <span>Review Findings ({findings.length})</span>
+                <span>Review Findings ({severityStats.total})</span>
               </button>
             </div>
           </div>
@@ -148,7 +150,7 @@ export const DashboardPage: React.FC = () => {
             action={
               <Link
                 to="/findings"
-                className="text-xs text-sentinel-cyan hover:underline flex items-center gap-1 font-mono"
+                className="text-xs text-sentinel-cyan hover:text-cyan-300 flex items-center gap-1 font-medium transition-colors"
               >
                 <span>View All Findings</span>
                 <ArrowRight size={13} />
@@ -166,29 +168,32 @@ export const DashboardPage: React.FC = () => {
             subtitle="Recommended assessment protocols"
           >
             <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-lg border border-sentinel-border bg-sentinel-elevated/40 space-y-1">
-                <div className="flex items-center justify-between text-sentinel-text font-semibold">
-                  <span>1. Specify Scope & Authorization</span>
+              <div className="p-3.5 rounded-xl border border-sentinel-border bg-sentinel-elevated/40 space-y-1.5 hover:border-sentinel-border-light transition-colors">
+                <div className="flex items-center gap-2 text-sentinel-text font-semibold">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-md bg-cyan-950/80 border border-cyan-800/60 text-cyan-300 font-mono text-[10px]">1</span>
+                  <span>Specify Scope & Authorization</span>
                 </div>
-                <p className="text-sentinel-muted leading-relaxed">
+                <p className="text-sentinel-muted leading-relaxed pl-7">
                   Provide valid FQDN or IPv4. The ethics gate guarantees authorized testing boundaries.
                 </p>
               </div>
 
-              <div className="p-3 rounded-lg border border-sentinel-border bg-sentinel-elevated/40 space-y-1">
-                <div className="flex items-center justify-between text-sentinel-text font-semibold">
-                  <span>2. Watch Live Agent Telemetry</span>
+              <div className="p-3.5 rounded-xl border border-sentinel-border bg-sentinel-elevated/40 space-y-1.5 hover:border-sentinel-border-light transition-colors">
+                <div className="flex items-center gap-2 text-sentinel-text font-semibold">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-md bg-cyan-950/80 border border-cyan-800/60 text-cyan-300 font-mono text-[10px]">2</span>
+                  <span>Watch Live Agent Telemetry</span>
                 </div>
-                <p className="text-sentinel-muted leading-relaxed">
+                <p className="text-sentinel-muted leading-relaxed pl-7">
                   Monitor the autonomous AI decision loop as Nmap, httpx, and Nuclei are orchestrated.
                 </p>
               </div>
 
-              <div className="p-3 rounded-lg border border-sentinel-border bg-sentinel-elevated/40 space-y-1">
-                <div className="flex items-center justify-between text-sentinel-text font-semibold">
-                  <span>3. Triage & Remediate</span>
+              <div className="p-3.5 rounded-xl border border-sentinel-border bg-sentinel-elevated/40 space-y-1.5 hover:border-sentinel-border-light transition-colors">
+                <div className="flex items-center gap-2 text-sentinel-text font-semibold">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-md bg-cyan-950/80 border border-cyan-800/60 text-cyan-300 font-mono text-[10px]">3</span>
+                  <span>Triage & Remediate</span>
                 </div>
-                <p className="text-sentinel-muted leading-relaxed">
+                <p className="text-sentinel-muted leading-relaxed pl-7">
                   Inspect raw technical evidence, verify exploitability, and copy actionable code fixes.
                 </p>
               </div>
@@ -204,7 +209,7 @@ export const DashboardPage: React.FC = () => {
         action={
           <Link
             to="/history"
-            className="text-xs text-sentinel-cyan hover:underline flex items-center gap-1 font-mono"
+            className="text-xs text-sentinel-cyan hover:text-cyan-300 flex items-center gap-1 font-medium transition-colors"
           >
             <span>Complete Scan Archive</span>
             <ArrowRight size={13} />
@@ -259,7 +264,7 @@ export const DashboardPage: React.FC = () => {
                       <td className="px-4 py-3.5">
                         <StatusBadge status={scan.status} size="sm" />
                       </td>
-                      <td className="px-4 py-3.5 text-sentinel-dim font-mono">
+                      <td className="px-4 py-3.5 text-sentinel-dim font-mono tabular-nums whitespace-nowrap">
                         {new Date(scan.startedAt).toLocaleDateString()} {new Date(scan.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td className="px-4 py-3.5">
