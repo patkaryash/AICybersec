@@ -22,6 +22,7 @@ import {
   inferScopeFromTarget,
 } from '../services/adapters';
 import { ApiClientError } from '../services/apiClient';
+import { useAuth } from './AuthContext';
 
 interface ScanContextType {
   scans: Scan[];
@@ -48,6 +49,12 @@ interface ScanContextType {
 const ScanContext = createContext<ScanContextType | undefined>(undefined);
 
 export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Auth state gates real-API fetching: ScanProvider mounts inside
+  // AuthProvider, but child effects run BEFORE parent effects — so an
+  // ungated fetch here would hit the API before the session restore
+  // attaches the token, 401, and wipe the stored session via the
+  // apiClient's global unauthorized handler.
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [isDemo, setIsDemo] = useState<boolean>(isDemoMode);
   const [scans, setScans] = useState<Scan[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
@@ -88,6 +95,23 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setFindings(allFindings);
         setSeverityStats(stats);
         setProjects([]);
+      } else if (!isAuthenticated) {
+        // No session (restore still pending, or logged out): never call
+        // the API without a token. An unauthenticated request would 401
+        // and the apiClient's global handler would evict the stored
+        // session. Just present empty state; this re-runs once auth
+        // resolves (see the effect below).
+        setScans([]);
+        setFindings([]);
+        setProjects([]);
+        setSeverityStats({
+          critical: 0,
+          high: 0,
+          medium: 0,
+          low: 0,
+          info: 0,
+          total: 0,
+        });
       } else {
         // REAL API MODE: load from /api/v1
         const [dash, scansRes, projectsRes] = await Promise.all([
@@ -135,11 +159,21 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
       isRefreshingRef.current = false;
     }
-  }, [isDemo]);
+  }, [isDemo, isAuthenticated]);
 
   useEffect(() => {
+    // Wait for session restore before the first real-mode fetch; re-runs
+    // on login/logout (isAuthenticated flip changes refreshData identity).
+    if (!isDemo && authLoading) return;
+    // A real authenticated session always wins over the demo flag (e.g.
+    // left over from the login page's demo bypass): exit demo mode so the
+    // user sees live backend data, not mock telemetry.
+    if (isDemo && isAuthenticated) {
+      toggleDemoMode(false);
+      return;
+    }
     refreshData();
-  }, [refreshData]);
+  }, [refreshData, isDemo, authLoading, isAuthenticated, toggleDemoMode]);
 
   const createScan = async (
     target: string,
