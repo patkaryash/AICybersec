@@ -1,5 +1,5 @@
 /**
- * Centralized API Client for Sentinel AI backend (/api/v1)
+ * Centralized API Client for CyberSec AI backend (/api/v1)
  *
  * Implements:
  * - Base URL & environment configuration
@@ -114,7 +114,7 @@ class ApiClient {
     } catch (networkErr: unknown) {
       const msg = networkErr instanceof Error ? networkErr.message : 'Network request failed';
       throw new ApiClientError(
-        `Unable to connect to Sentinel AI backend (${this.baseUrl}). ${msg}`,
+        `Unable to connect to CyberSec AI backend (${this.baseUrl}). ${msg}`,
         'NETWORK_ERROR',
         0
       );

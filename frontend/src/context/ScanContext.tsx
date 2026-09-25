@@ -123,7 +123,7 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSeverityStats(stats);
       }
     } catch (err: unknown) {
-      console.error('Failed to load Sentinel security telemetry:', err);
+      console.error('Failed to load CyberSec AI security telemetry:', err);
       if (err instanceof ApiClientError) {
         setError(`Backend error: ${err.message} (${err.code})`);
       } else if (err instanceof Error) {

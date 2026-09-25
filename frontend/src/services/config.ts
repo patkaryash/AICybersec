@@ -1,5 +1,5 @@
 /**
- * Sentinel AI — Configuration and Mode Detection
+ * CyberSec AI — Configuration and Mode Detection
  */
 
 export function isDemoMode(): boolean {

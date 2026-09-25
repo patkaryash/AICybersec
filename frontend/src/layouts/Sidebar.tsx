@@ -85,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-base tracking-tight text-sentinel-text">Sentinel</span>
+                <span className="font-bold text-base tracking-tight text-sentinel-text">CyberSec</span>
                 <span className="text-xs px-1.5 py-0.2 rounded font-mono font-semibold bg-cyan-950/80 text-sentinel-cyan border border-cyan-800/60">
                   AI
                 </span>

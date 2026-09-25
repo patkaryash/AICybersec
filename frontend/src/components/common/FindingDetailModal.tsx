@@ -362,7 +362,7 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
         {/* Footer */}
         <div className="p-4 border-t border-sentinel-border bg-sentinel-bg/80 flex items-center justify-between">
           <span className="text-xs text-sentinel-dim font-mono">
-            Sentinel AI • Normalized Finding Record
+            CyberSec AI • Normalized Finding Record
           </span>
           <button
             onClick={onClose}

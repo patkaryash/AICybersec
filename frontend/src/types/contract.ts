@@ -1,5 +1,5 @@
 /**
- * Sentinel AI — Backend v1 Frozen API Contract Types
+ * CyberSec AI — Backend v1 Frozen API Contract Types
  * Directly maps to backend schemas and DTOs.
  */
 

@@ -18,7 +18,7 @@ export const INITIAL_FINDINGS: Finding[] = [
     status: 'open',
     detectedAt: '2026-09-23T14:15:32Z',
     evidence: {
-      request: 'GET /api/v1/customers/search?q=test%27+OR+1%3D1--+HTTP/1.1\nHost: staging.payments.internal\nUser-Agent: SentinelAI/1.0-Synthetic',
+      request: 'GET /api/v1/customers/search?q=test%27+OR+1%3D1--+HTTP/1.1\nHost: staging.payments.internal\nUser-Agent: CyberSec AI/1.0-Synthetic',
       response: 'HTTP/1.1 200 OK\nContent-Type: application/json\nX-Database-Latency: 184ms\n\n[{"id": 1, "name": "Admin Root", "email": "admin@internal.corp", "role": "superuser"}]',
       matchedPattern: "syntax error at or near 'OR 1=1'",
       extractedData: {

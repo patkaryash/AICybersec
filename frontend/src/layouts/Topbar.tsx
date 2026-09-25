@@ -47,7 +47,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
     if (path === '/history') {
       return { title: 'Scan History & Audits', subtitle: 'Comprehensive archive of historical penetration testing runs' };
     }
-    return { title: 'Sentinel AI', subtitle: 'AI-Assisted Penetration Testing Platform' };
+    return { title: 'CyberSec AI', subtitle: 'AI-Assisted Penetration Testing Platform' };
   };
 
   const pageInfo = getPageInfo();
@@ -157,7 +157,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
 
               <button
                 onClick={handleLogout}
-                title="Sign out of Sentinel AI"
+                title="Sign out of CyberSec AI"
                 className="p-2 rounded-lg border border-sentinel-border text-sentinel-muted hover:text-rose-400 hover:bg-rose-950/20 text-xs transition-colors"
                 aria-label="Logout"
               >

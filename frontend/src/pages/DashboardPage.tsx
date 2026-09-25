@@ -36,7 +36,7 @@ export const DashboardPage: React.FC = () => {
     return (
       <div className="py-24 text-center">
         <div className="inline-block animate-spin w-8 h-8 border-2 border-sentinel-cyan border-t-transparent rounded-full mb-3" />
-        <p className="text-xs text-sentinel-muted font-mono">Initializing Sentinel AI Telemetry...</p>
+        <p className="text-xs text-sentinel-muted font-mono">Initializing CyberSec AI Telemetry...</p>
       </div>
     );
   }
