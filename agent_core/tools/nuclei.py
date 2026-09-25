@@ -61,7 +61,7 @@ def build_nuclei_argv(params: NucleiParams) -> list[str]:
 
     Fixed profile (no caller influence):
         nuclei -jsonl -silent -nc -severity critical,high,medium
-               -tags cve,misconfiguration,exposure,default-login
+               -tags cve,misconfig,exposure,default-login
                -rate-limit 150 -bulk-size 25 -concurrency 25
                -timeout 10 -retries 1 -omit-raw -ni
     Targets: repeated ``-target <target>`` pairs, each a separate element.
@@ -77,7 +77,7 @@ def build_nuclei_argv(params: NucleiParams) -> list[str]:
         "-severity",
         "critical,high,medium",
         "-tags",
-        "cve,misconfiguration,exposure,default-login",
+        "cve,misconfig,exposure,default-login",
         "-rate-limit",
         "150",
         "-bulk-size",

@@ -79,7 +79,34 @@ def test_recon_and_web_profiles():
     web = PipelinePlanner("web", SNAP)
     d1 = web.decide(_state())
     assert isinstance(d1, ToolCall) and d1.tool == "httpx"
-    assert d1.params["targets"] == ["http://demo.local", "http://other.local"]
+    # URL scope entries carry the authoritative port: used verbatim.
+    assert d1.params["targets"] == ["http://other.local:8080/x"]
+
+
+def test_web_profile_uses_url_scope_ports_verbatim():
+    """Regression: web profile (no nmap stage) must not fall back to
+    port 80 when scope URLs carry an explicit non-standard port."""
+    snap = [
+        {"type": "host", "value": "demo.local", "note": None},
+        {"type": "url", "value": "http://juice-shop:3000", "note": None},
+    ]
+    d = PipelinePlanner("web", snap).decide(_state())
+    assert isinstance(d, ToolCall) and d.tool == "httpx"
+    assert d.params["targets"] == ["http://juice-shop:3000"]
+
+    # nuclei, without usable httpx observations, seeds the same way.
+    d2 = PipelinePlanner("web", snap).decide(_state([_obs("httpx", data={})]))
+    assert isinstance(d2, ToolCall) and d2.tool == "nuclei"
+    assert d2.params["targets"] == ["http://juice-shop:3000"]
+
+    # nmap-derived URLs still win when present (full profile path).
+    d3 = PipelinePlanner("web", snap).decide(
+        _state([_obs("nmap", data={"hosts": [
+            {"ip": "172.18.0.3", "ports": [{"port": 3000, "state": "open"}]}
+        ]})])
+    )
+    assert isinstance(d3, ToolCall)
+    assert d3.params["targets"] == ["http://172.18.0.3:3000"]
 
 
 def test_unknown_profile_falls_back_to_full():

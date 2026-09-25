@@ -242,7 +242,7 @@ Phase 3 pipeline profiles:
 Each step is a `Decision → SafetyValidator → ToolRegistry → Tool`
 round-trip. nmap/httpx are reconnaissance (`danger_level=safe`); nuclei
 is template-based vulnerability scanning (`danger_level=active_scan`,
-`cve,misconfiguration,exposure,default-login` tags, medium+ severity).
+`cve,misconfig,exposure,default-login` tags, medium+ severity).
 Tools run as pinned binaries with fixed argv (no shell, no arbitrary
 flags); raw tool output never enters model context or event payloads.
 
