@@ -36,8 +36,8 @@ services:
       AICYBERSEC_JWT_SECRET: dev-insecure-jwt-secret-change-me
       AICYBERSEC_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       AICYBERSEC_RUNS_DIR: /app/runs
-      AICYBERSEC_ADMIN_EMAIL: admin@aicybersec.dev
-      AICYBERSEC_ADMIN_PASSWORD: admin-dev-password-change-me
+      AICYBERSEC_ADMIN_EMAIL: admin@gmail.com
+      AICYBERSEC_ADMIN_PASSWORD: admin123
     ports:
       - "8000:8000"
     depends_on:
@@ -47,6 +47,10 @@ services:
     command: ["sh", "-c", "alembic upgrade head && uvicorn backend.main:app --host 0.0.0.0 --port 8000"]
     volumes:
       - runs:/app/runs
+      # Persists the nuclei template DB (~/nuclei-templates, ~/.config/nuclei)
+      # across container restarts so scans work fully offline after a single
+      # one-time template download.
+      - nuclei-home:/home/appuser
     cpus: 2.0
     mem_limit: 1g
     cap_drop:
@@ -70,3 +74,4 @@ services:
 volumes:
   pgdata:
   runs:
+  nuclei-home:
