@@ -42,10 +42,14 @@ def dashboard_data(session: Session, *, user: User, recent_limit: int = DEFAULT_
     total_scans = (
         session.scalar(select(func.count()).select_from(scan_base.subquery())) or 0
     )
+    # Group by the SUBQUERY's column, not the entity attribute: grouping by
+    # Scan.status would implicitly re-add the scans table to the FROM clause
+    # (cartesian product) and multiply every count.
+    scan_sub = scan_base.subquery()
     status_rows = session.execute(
-        select(Scan.status, func.count())
-        .select_from(scan_base.subquery())
-        .group_by(Scan.status)
+        select(scan_sub.c.status, func.count())
+        .select_from(scan_sub)
+        .group_by(scan_sub.c.status)
     ).all()
     scans_by_status = {s: 0 for s in SCAN_STATUSES}
     for status, count in status_rows:
@@ -56,10 +60,11 @@ def dashboard_data(session: Session, *, user: User, recent_limit: int = DEFAULT_
     total_findings = (
         session.scalar(select(func.count()).select_from(finding_base.subquery())) or 0
     )
+    finding_sub = finding_base.subquery()
     severity_rows = session.execute(
-        select(Finding.scanner_severity, func.count())
-        .select_from(finding_base.subquery())
-        .group_by(Finding.scanner_severity)
+        select(finding_sub.c.scanner_severity, func.count())
+        .select_from(finding_sub)
+        .group_by(finding_sub.c.scanner_severity)
     ).all()
     findings_by_severity = {s: 0 for s in SEVERITIES}
     for severity, count in severity_rows:
