@@ -63,8 +63,11 @@ def build_httpx_argv(params: HTTPXParams) -> list[str]:
     Base (fixed, no caller influence):
         httpx -json -silent -nc -sc -cl -ct -title -server -method
               -td -ip -cname -cdn -tls-probe -follow-redirects
-              -timeout 10 -retries 1 -threads 50 -rate-limit 150
+              -timeout 10 -retries 1 -threads 50 -rate-limit 150 -duc
     Targets: repeated ``-u <target>`` pairs, each a separate element.
+
+    -duc disables the automatic version-update check, which would add
+    uncontrolled external-network latency to every run.
     """
     argv: list[str] = [
         HTTPX_BINARY,
@@ -91,6 +94,7 @@ def build_httpx_argv(params: HTTPXParams) -> list[str]:
         "50",
         "-rate-limit",
         "150",
+        "-duc",
     ]
     for t in params.targets:
         argv += ["-u", t]

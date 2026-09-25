@@ -63,8 +63,11 @@ def build_nuclei_argv(params: NucleiParams) -> list[str]:
         nuclei -jsonl -silent -nc -severity critical,high,medium
                -tags cve,misconfiguration,exposure,default-login
                -rate-limit 150 -bulk-size 25 -concurrency 25
-               -timeout 10 -retries 1 -omit-raw
+               -timeout 10 -retries 1 -omit-raw -ni
     Targets: repeated ``-target <target>`` pairs, each a separate element.
+
+    -ni disables interactsh (out-of-band) callbacks, whose waits dominate
+    total runtime and push scans past the tool timeout in lab runs.
     """
     argv: list[str] = [
         NUCLEI_BINARY,
@@ -86,6 +89,7 @@ def build_nuclei_argv(params: NucleiParams) -> list[str]:
         "-retries",
         "1",
         "-omit-raw",
+        "-ni",
     ]
     for t in params.targets:
         argv += ["-target", t]
