@@ -41,6 +41,11 @@ class BackendSettings(BaseSettings):
     default_tool_timeout_s: int = 300
     max_tool_output_bytes: int = 524_288  # 512 KB
 
+    # --- Scan execution (Phase 3) ---
+    # Whether POST /scans submits the scan to the ScanManager immediately.
+    # Default True (production behavior); tests set 0 for determinism.
+    scan_auto_start: bool = True
+
     # --- Runtime artifacts (agent state, trajectory, raw tool output) ---
     runs_dir: str = "runs"
 

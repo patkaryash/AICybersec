@@ -158,14 +158,25 @@ def list_scans(
 
 
 def cancel_scan(session: Session, *, user: User, scan_id: uuid.UUID) -> Scan:
-    """Phase 2 cancellation: pure state management.
+    """Cancel a scan (Phase 3: signals the worker when running).
 
-    queued/initializing -> cancelled (direct); any other state ->
-    409 SCAN_NOT_CANCELLABLE. No process termination (Phase 3).
+    queued/initializing -> cancelled (direct, nothing is executing).
+    running -> cancelling + cooperative signal to the ScanManager worker;
+    the runtime observes it at the top of its loop. A mid-tool cancel
+    waits out that tool's timeout (documented AgentRuntime semantics).
+    Any other state -> 409 SCAN_NOT_CANCELLABLE.
     """
+    from backend.services.scan_manager import get_scan_manager
+
     scan = get_scan_for_user(session, scan_id, user)
     if scan.status not in CANCELLABLE_STATUSES:
         raise ApiError(ErrorCode.SCAN_NOT_CANCELLABLE, "Scan is not cancellable.")
+    if scan.status == "running":
+        apply_transition(scan, "cancelling")
+        session.commit()
+        session.refresh(scan)
+        get_scan_manager().request_cancel(scan.id)
+        return scan
     apply_transition(scan, "cancelled")
     session.commit()
     session.refresh(scan)
