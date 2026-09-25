@@ -88,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const tokenRes = await authService.login(credentials);
       localStorage.setItem(AUTH_TOKEN_KEY, tokenRes.access_token);
+      localStorage.removeItem('sentinel_demo_mode');
       apiClient.setToken(tokenRes.access_token);
       setTokenState(tokenRes.access_token);
 

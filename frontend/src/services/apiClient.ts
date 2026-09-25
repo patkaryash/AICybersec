@@ -43,6 +43,8 @@ export interface ApiResponse<T> {
 
 type UnauthorizedHandler = () => void;
 
+const AUTH_TOKEN_KEY = 'sentinel_auth_token';
+
 class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -52,6 +54,13 @@ class ApiClient {
     const envUrl = import.meta.env.VITE_API_BASE_URL;
     // Default to http://localhost:8000 if not configured
     this.baseUrl = (envUrl || 'http://localhost:8000').replace(/\/+$/, '');
+    if (typeof window !== 'undefined') {
+      try {
+        this.token = localStorage.getItem(AUTH_TOKEN_KEY);
+      } catch {
+        this.token = null;
+      }
+    }
   }
 
   public setToken(token: string | null): void {
@@ -59,7 +68,10 @@ class ApiClient {
   }
 
   public getToken(): string | null {
-    return this.token;
+    return (
+      this.token ||
+      (typeof window !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null)
+    );
   }
 
   public onUnauthorized(handler: UnauthorizedHandler): () => void {
@@ -96,8 +108,9 @@ class ApiClient {
     headers.set('Accept', 'application/json');
 
     // Attach Bearer token if available
-    if (this.token && !headers.has('Authorization')) {
-      headers.set('Authorization', `Bearer ${this.token}`);
+    const activeToken = this.getToken();
+    if (activeToken && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${activeToken}`);
     }
 
     // Set Content-Type to application/json if sending a body and not FormData

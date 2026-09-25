@@ -79,6 +79,13 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const refreshData = useCallback(async () => {
+    // Protected data fetching must wait until session restoration has finished.
+    // If not demo mode and session restoration is still in progress, do NOT
+    // execute requests or prematurely treat the state as unauthenticated.
+    if (!isDemo && authLoading) {
+      return;
+    }
+
     if (isRefreshingRef.current) return;
     isRefreshingRef.current = true;
     setError(null);
@@ -96,11 +103,8 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSeverityStats(stats);
         setProjects([]);
       } else if (!isAuthenticated) {
-        // No session (restore still pending, or logged out): never call
-        // the API without a token. An unauthenticated request would 401
-        // and the apiClient's global handler would evict the stored
-        // session. Just present empty state; this re-runs once auth
-        // resolves (see the effect below).
+        // Session restoration finished and user is not authenticated:
+        // Present empty state; ProtectedRoute will handle unauthenticated redirect.
         setScans([]);
         setFindings([]);
         setProjects([]);
@@ -113,7 +117,7 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
           total: 0,
         });
       } else {
-        // REAL API MODE: load from /api/v1
+        // REAL API MODE: load from /api/v1 (authenticated session verified)
         const [dash, scansRes, projectsRes] = await Promise.all([
           realDashboardService.getDashboard(10),
           realScanService.listScans({ pageSize: 50 }),
@@ -159,7 +163,7 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
       isRefreshingRef.current = false;
     }
-  }, [isDemo, isAuthenticated]);
+  }, [isDemo, isAuthenticated, authLoading]);
 
   useEffect(() => {
     // Wait for session restore before the first real-mode fetch; re-runs
