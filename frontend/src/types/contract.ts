@@ -89,7 +89,7 @@ export interface UserOut {
 // Projects
 // ==========================================
 
-export type ScopeType = 'host' | 'cidr' | 'url';
+export type ScopeType = 'host' | 'cidr' | 'url' | 'domain';
 export type ProjectStatus = 'active' | 'archived';
 
 export interface ScopeEntry {
@@ -222,7 +222,7 @@ export interface FindingOut {
 // Assets
 // ==========================================
 
-export type AssetType = 'host' | 'service' | 'url';
+export type AssetType = 'host' | 'subdomain' | 'domain' | 'service' | 'url' | 'endpoint';
 
 export interface AssetOut {
   id: string;
@@ -233,6 +233,7 @@ export interface AssetOut {
   host: string | null;
   port: number | null;
   scheme: string | null;
+  parent_asset_id: string | null;
   attributes: Record<string, unknown>;
   source_tool: string;
   created_at: string;

@@ -90,6 +90,40 @@ def test_check_constraints_present():
     assert {"ck_scans_status", "ck_scans_mode", "ck_scans_profile"} <= checks
 
 
+def test_asset_attack_surface_vocabulary():
+    """Phase 4A: assets cover the attack-surface graph (host, subdomain,
+    domain, service, url, endpoint) with an optional self-referential
+    parent link; pre-4A host/service/url rows remain valid."""
+    from backend.db.models import ASSET_TYPES
+
+    assert set(ASSET_TYPES) == {
+        "host",
+        "subdomain",
+        "domain",
+        "service",
+        "url",
+        "endpoint",
+    }
+    asset = Base.metadata.tables["assets"]
+    checks = {
+        c.name: str(c.sqltext)
+        for c in asset.constraints
+        if c.__class__.__name__ == "CheckConstraint"
+    }
+    assert "ck_assets_type" in checks
+    for asset_type in ASSET_TYPES:
+        assert f"'{asset_type}'" in checks["ck_assets_type"]
+    assert "parent_asset_id" in {c.name for c in asset.columns}
+    parent_fks = [
+        fk for fk in asset.foreign_keys if fk.parent.name == "parent_asset_id"
+    ]
+    assert len(parent_fks) == 1
+    assert parent_fks[0].column.table.name == "assets"
+    assert parent_fks[0].ondelete == "SET NULL"
+    index_names = {i.name for i in asset.indexes}
+    assert {"uq_assets_scan_identity", "ix_assets_project_type", "ix_assets_parent"} <= index_names
+
+
 def test_ddl_renders_on_sqlite(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 't.db'}")
     Base.metadata.create_all(engine)

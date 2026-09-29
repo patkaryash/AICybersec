@@ -6,10 +6,16 @@ matching reuses agent_core's Policy.normalize_target (backend ->
 agent_core dependency only; agent_core is never modified).
 
 Supported entry types:
-    host: hostname, IPv4, IPv6 (canonical: lowercase / compressed)
-    cidr: IPv4/IPv6 network (canonical: network address form)
-    url:  http/https URL (validated; reduced to host form at MATCH time
-          by Policy.normalize_target, so one entry covers the URL)
+    host:   hostname, IPv4, IPv6 (canonical: lowercase / compressed)
+    cidr:   IPv4/IPv6 network (canonical: network address form)
+    url:    http/https URL (validated; reduced to host form at MATCH time
+            by Policy.normalize_target, so one entry covers the URL)
+    domain: DNS domain name authorizing assessment of that exact domain
+            (canonical: lowercase). A domain entry authorizes ONLY the
+            exact domain itself - subdomains discovered later (e.g. via
+            future Subfinder/DNSX stages) remain discovered CANDIDATES
+            until an explicit promotion rule authorizes them; they are
+            never implicitly in scope (see target_in_scope).
 
 Rejects with INVALID_TARGET: malformed hostnames, invalid IPs, invalid
 CIDR, unsupported schemes, embedded credentials, invalid ports,
@@ -57,6 +63,70 @@ def _validate_hostname(value: str) -> str:
     if not lowered or len(lowered) > 253 or not _HOSTNAME_RE.match(lowered):
         raise ApiError(ErrorCode.INVALID_TARGET, f"Malformed host: {value!r}")
     return lowered
+
+
+def _validate_domain(value: str) -> str:
+    """Validate + canonicalize a domain scope entry (Phase 4A).
+
+    Strict DNS-name-only rule: no URL scheme, no userinfo, no wildcard,
+    no leading '-', no IP literal, bounded length, normalized case.
+    Rejects with INVALID_TARGET like every other scope type.
+    """
+    v = value.strip()
+    if not v:
+        raise ApiError(ErrorCode.INVALID_TARGET, f"Malformed domain: {value!r}")
+    if "://" in v:
+        raise ApiError(
+            ErrorCode.INVALID_TARGET,
+            f"Domain must not include a URL scheme: {value!r}",
+        )
+    if "@" in v:
+        raise ApiError(
+            ErrorCode.INVALID_TARGET, "Embedded credentials in domains are not allowed"
+        )
+    if "*" in v:
+        raise ApiError(
+            ErrorCode.INVALID_TARGET,
+            f"Wildcard domains are not supported: {value!r}",
+        )
+    if v.endswith("."):  # strip at most one trailing root dot
+        v = v[:-1]
+    if v.startswith("-"):
+        raise ApiError(ErrorCode.INVALID_TARGET, f"Malformed domain: {value!r}")
+    try:
+        ipaddress.ip_address(v)
+    except ValueError:
+        pass
+    else:
+        raise ApiError(
+            ErrorCode.INVALID_TARGET,
+            f"Domain must be a DNS name, not an IP literal: {value!r}",
+        )
+    lowered = v.lower()
+    if _IPV4_RE.match(v):
+        raise ApiError(ErrorCode.INVALID_TARGET, f"Malformed domain: {value!r}")
+    if not lowered or len(lowered) > 253 or not _HOSTNAME_RE.match(lowered):
+        raise ApiError(ErrorCode.INVALID_TARGET, f"Malformed domain: {value!r}")
+    return lowered
+
+
+def is_valid_hostname_syntax(value: str) -> bool:
+    """Non-raising DNS-name syntax check (Phase 4B).
+
+    Same strictness as domain scope validation (no scheme, no userinfo,
+    no wildcard, no IP literal, bounded length, RFC 1123 labels) without
+    raising: returns False for anything else, including non-strings.
+    Used by the subdomain promotion policy to filter untrusted
+    discovery names; authorization itself stays in validate_scope /
+    target_in_scope / SafetyValidator.
+    """
+    if not isinstance(value, str):
+        return False
+    try:
+        _validate_domain(value)
+    except ApiError:
+        return False
+    return True
 
 
 def _validate_cidr(value: str) -> str:
@@ -109,6 +179,8 @@ def validate_scope(entries: list[ScopeEntry]) -> list[dict[str, Any]]:
             value = _validate_cidr(entry.value)
         elif entry.type == "url":
             value = _validate_url(entry.value)
+        elif entry.type == "domain":
+            value = _validate_domain(entry.value)
         else:
             raise ApiError(ErrorCode.INVALID_TARGET, f"Unsupported scope type: {entry.type!r}")
         out.append({"type": entry.type, "value": value, "note": entry.note})
@@ -118,8 +190,15 @@ def validate_scope(entries: list[ScopeEntry]) -> list[dict[str, Any]]:
 def target_in_scope(snapshot: list[dict[str, Any]], target: str) -> bool:
     """True when target is inside the snapshot's authorized scope.
 
-    Host/URL entries match by host-normalized comparison; CIDR entries
-    match by subnet membership. Empty snapshot authorizes nothing.
+    Host/URL/domain entries match by EXACT host-normalized comparison;
+    CIDR entries match by subnet membership. Empty snapshot authorizes
+    nothing.
+
+    Phase 4A invariant: a ``domain`` entry authorizes ONLY the exact
+    domain itself. ``sub.example.com`` is NOT in scope when the snapshot
+    holds ``{"type": "domain", "value": "example.com"}`` - discovered
+    subdomains stay unauthorized until an explicit promotion rule (a
+    future Subfinder/DNSX phase) authorizes them.
     """
     normalized = Policy.normalize_target(target)
     if normalized is None:
@@ -135,6 +214,7 @@ def target_in_scope(snapshot: list[dict[str, Any]], target: str) -> bool:
                     return True
             except ValueError:
                 continue
-        elif Policy.normalize_target(value) == normalized:
-            return True
+        elif etype in ("host", "url", "domain"):
+            if Policy.normalize_target(value) == normalized:
+                return True
     return False

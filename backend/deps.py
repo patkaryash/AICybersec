@@ -20,16 +20,18 @@ from agent_core.tools.mocks import MockPortScan, MockWebProbe
 from agent_core.tools.nmap import NmapTool
 from agent_core.tools.nuclei import NucleiTool
 from agent_core.tools.registry import ToolRegistry
+from agent_core.tools.subfinder import SubfinderTool
 
 
 def build_registry() -> ToolRegistry:
-    """Mock tools + real tools (nmap, httpx, nuclei). Real scans still require allowlist."""
+    """Mock tools + real tools (nmap, httpx, nuclei, subfinder). Real scans still require allowlist."""
     registry = ToolRegistry()
     registry.register(MockPortScan())
     registry.register(MockWebProbe())
     registry.register(NmapTool())
     registry.register(HTTPXTool())
     registry.register(NucleiTool())
+    registry.register(SubfinderTool())
     return registry
 
 

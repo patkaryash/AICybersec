@@ -1,5 +1,5 @@
 # Backend + scanner image: the FastAPI app plus the security tools it
-# executes (nmap, httpx, nuclei) with pinned versions.
+# executes (nmap, httpx, nuclei, subfinder) with pinned versions.
 #
 # NOTE: containerization is a hardening layer, not a complete sandbox.
 # Tools run as a non-root user with dropped capabilities; nmap is used in
@@ -14,9 +14,12 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends nmap unzip curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Pinned projectdiscovery tools (httpx + nuclei ship as release zips).
+# Pinned projectdiscovery tools (httpx + nuclei + subfinder ship as
+# release zips; asset names follow the goreleaser name_template
+# '<project>_<version>_<os>_<arch>').
 ARG HTTPX_VERSION=1.6.0
 ARG NUCLEI_VERSION=3.3.7
+ARG SUBFINDER_VERSION=2.16.0
 RUN curl -sSL -o /tmp/httpx.zip \
         "https://github.com/projectdiscovery/httpx/releases/download/v${HTTPX_VERSION}/httpx_${HTTPX_VERSION}_linux_amd64.zip" \
     && unzip -o /tmp/httpx.zip httpx -d /usr/local/bin \
@@ -26,7 +29,12 @@ RUN curl -sSL -o /tmp/httpx.zip \
         "https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}/nuclei_${NUCLEI_VERSION}_linux_amd64.zip" \
     && unzip -o /tmp/nuclei.zip nuclei -d /usr/local/bin \
     && chmod +x /usr/local/bin/nuclei \
-    && rm /tmp/nuclei.zip
+    && rm /tmp/nuclei.zip \
+    && curl -sSL -o /tmp/subfinder.zip \
+        "https://github.com/projectdiscovery/subfinder/releases/download/v${SUBFINDER_VERSION}/subfinder_${SUBFINDER_VERSION}_linux_amd64.zip" \
+    && unzip -o /tmp/subfinder.zip subfinder -d /usr/local/bin \
+    && chmod +x /usr/local/bin/subfinder \
+    && rm /tmp/subfinder.zip
 
 WORKDIR /app
 
