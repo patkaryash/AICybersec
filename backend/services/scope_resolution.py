@@ -64,7 +64,9 @@ def resolve_scope(
 ) -> list[str]:
     """Build the scan's authorized target list (host-normalized).
 
-    - host/url entries: their host form (existing behavior)
+    - host/url/domain entries: their host form (existing behavior;
+      Phase 4A adds domain entries, which authorize ONLY the exact
+      domain - never its subdomains)
     - cidr entries: skipped (networks cannot be expanded safely in
       Phase 3 v1; documented limitation)
     - PLUS: forward-DNS resolutions of authorized HOSTNAMES - the only
@@ -75,7 +77,11 @@ def resolve_scope(
     allowed: list[str] = []
     hostnames: list[str] = []
     for entry in snapshot or []:
-        if not isinstance(entry, dict) or entry.get("type") not in ("host", "url"):
+        if not isinstance(entry, dict) or entry.get("type") not in (
+            "host",
+            "url",
+            "domain",
+        ):
             continue
         host = Policy.normalize_target(entry.get("value"))
         if not host or host in allowed:

@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-ScopeType = Literal["host", "cidr", "url"]
+ScopeType = Literal["host", "cidr", "url", "domain"]
 ProjectStatus = Literal["active", "archived"]
 
 

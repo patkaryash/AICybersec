@@ -55,6 +55,10 @@ USER_ROLES = ("user", "admin")
 TOOL_RUN_STATUSES = ("running", "completed", "failed", "timeout", "cancelled")
 SEVERITIES = ("info", "low", "medium", "high", "critical")
 FINDING_STATUSES = ("open", "accepted_risk", "resolved", "false_positive")
+# Phase 4A attack-surface vocabulary. Existing rows are host/service/url;
+# subdomain/endpoint/domain rows are produced only by future discovery
+# stages (Subfinder/DNSX/Katana) - never fabricated by this phase.
+ASSET_TYPES = ("host", "subdomain", "domain", "service", "url", "endpoint")
 
 
 class User(Base):
@@ -101,7 +105,9 @@ class Project(Base):
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="active", server_default="active"
     )
-    # Authorized scope: [{"type": "host"|"cidr"|"url", "value": "...", "note": "..."}]
+    # Authorized scope: [{"type": "host"|"cidr"|"url"|"domain", "value": "...",
+    #   "note": "..."}]. A domain entry authorizes ONLY the exact domain,
+    #   never its subdomains (see scope_service.target_in_scope).
     # Validated/normalized by the scope service; copied into
     # scans.target_snapshot at scan creation (the authorization anchor).
     scope: Mapped[list] = mapped_column(
@@ -179,11 +185,36 @@ class Scan(Base):
 
 
 class Asset(Base):
+    """Attack-surface node (Phase 4A foundation).
+
+    Conceptual graph (each level optionally links to its parent via
+    ``parent_asset_id``; NULL when the parent is unknown or out of scan):
+
+        domain -> subdomain -> host -> service -> url -> endpoint
+
+    Conventions (all queryable; see result_persistence builders):
+    - domain:    value/canonical domain (e.g. "example.com")
+    - subdomain: value/hostname (e.g. "api.example.com"),
+      attributes {parent_domain, source, verification_status,
+      dns_a[], dns_aaaa[], dns_cname[]}
+    - host:      value/host IP or hostname; attributes may carry
+      DNS enrichment {dns_a[], dns_aaaa[], dns_cname[]} (DATA only -
+      never authorization)
+    - service:   value "host:port"
+    - url:       value full URL (final_url preferred)
+    - endpoint:  value full URL; attributes {source_page?, crawl_depth?,
+      http_method?}
+    """
+
     __tablename__ = "assets"
     __table_args__ = (
-        CheckConstraint("asset_type IN ('host', 'service', 'url')", name="ck_assets_type"),
+        CheckConstraint(
+            "asset_type IN ('host', 'subdomain', 'domain', 'service', 'url', 'endpoint')",
+            name="ck_assets_type",
+        ),
         Index("uq_assets_scan_identity", "scan_id", "asset_type", "value", unique=True),
         Index("ix_assets_project_type", "project_id", "asset_type"),
+        Index("ix_assets_parent", "parent_asset_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -194,11 +225,20 @@ class Asset(Base):
         ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
     asset_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    # Canonical identifier: "host" | "host:port" | "scheme://host:port[/path]"
+    # Canonical identifier per type: domain/hostname | "host" |
+    # "host:port" | full URL. Existing host/service/url rows keep their
+    # exact values (the CHECK widening is purely additive).
     value: Mapped[str] = mapped_column(String(500), nullable=False)
     host: Mapped[str | None] = mapped_column(String(255))
     port: Mapped[int | None] = mapped_column(Integer)
     scheme: Mapped[str | None] = mapped_column(String(10))
+    # Optional link to the parent surface node in the same scan
+    # (e.g. endpoint -> url, subdomain -> domain). NULL when the parent
+    # is unknown - never guessed. Deleting the parent nulls the link
+    # (child evidence is preserved).
+    parent_asset_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("assets.id", ondelete="SET NULL")
+    )
     attributes: Mapped[dict] = mapped_column(
         _JSON, nullable=False, default=dict, server_default=text("'{}'")
     )

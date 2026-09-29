@@ -49,7 +49,10 @@ from backend.db.models import Scan, ToolRun
 from backend.services.db_sink import DatabaseEventSink
 from backend.services.event_service import record_event
 from backend.services.pipeline_planner import PipelinePlanner
-from backend.services.result_persistence import persist_assets_from_observations
+from backend.services.result_persistence import (
+    link_findings_to_assets,
+    persist_assets_from_observations,
+)
 from backend.services.scope_resolution import resolve_scope
 from backend.services.scan_state import apply_transition
 from backend.services.tool_runner import RunRecorder, make_cancelling_runner
@@ -322,6 +325,7 @@ class ScanManager:
         from agent_core.tools.nmap import NmapTool
         from agent_core.tools.nuclei import NucleiTool
         from agent_core.tools.registry import ToolRegistry
+        from agent_core.tools.subfinder import SubfinderTool
 
         spill_dir = str(Path(self._runs_dir) / str(scan_id))
         runner = make_cancelling_runner(cancel, spill_dir=spill_dir, recorder=recorder)
@@ -331,6 +335,10 @@ class ScanManager:
         registry.register(NmapTool(runner=runner))
         registry.register(HTTPXTool(runner=runner))
         registry.register(NucleiTool(runner=runner))
+        # Phase 4B: passive subdomain discovery (SAFE, scope-controlled).
+        # The tool's resolver defaults to stdlib forward-DNS (same
+        # semantics as the scope bridge); verification results are DATA.
+        registry.register(SubfinderTool(runner=runner))
         return registry
 
     def _finish_scan(self, scan_id: uuid.UUID, final, recorder: RunRecorder) -> None:
@@ -379,6 +387,10 @@ class ScanManager:
                     persist_assets_from_observations(
                         session, scan=scan, observations=getattr(final, "observations", [])
                     )
+                    # Findings are recorded live (before assets exist), so
+                    # deterministically link the ones that exactly match a
+                    # known asset; the rest stay NULL (never guessed).
+                    link_findings_to_assets(session, scan=scan)
                 except Exception:
                     logger.exception("asset persistence failed for scan %s", scan_id)
                 self._enrich_tool_runs(session, scan_id, recorder)
@@ -395,7 +407,7 @@ class ScanManager:
           ToolRun.status = cancelled (the tool itself reports error; it
           has no cancel concept); a timed-out run stays timeout.
         """
-        for tool in ("nmap", "httpx", "nuclei"):
+        for tool in ("nmap", "httpx", "nuclei", "subfinder"):
             records = recorder.records_for(tool)
             if not records:
                 continue
