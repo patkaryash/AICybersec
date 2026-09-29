@@ -1,4 +1,4 @@
-"""Deterministic real-tool pipeline planner (Phase 3).
+"""Deterministic real-tool pipeline planner (Phase 3 + Phase 4C Step 5).
 
 No model, no network, no execution: emits a fixed per-profile ToolCall
 sequence, deriving each stage's targets from prior observations:
@@ -9,14 +9,22 @@ sequence, deriving each stage's targets from prior observations:
 
 Target derivation (all values flow through SafetyValidator downstream):
 - nmap: every snapshot host entry, one host per call, ports bounded by
-  NMAP_PIPELINE_PORTS.
+  NMAP_PIPELINE_PORTS. NEVER receives promoted discovery hosts.
 - httpx: http(s) URLs from nmap open ports (443 -> https, else http),
-  capped; snapshot http-URL fallback when nmap yielded nothing usable.
+  capped; snapshot http-URL fallback when nmap yielded nothing usable;
+  PLUS run-local promoted discovery hosts (Phase 4C Step 5) as
+  ``http://<host>`` seeds, deduped and capped. Promoted hosts are
+  hostname-only, already DNS-verified/asset-backed by discovery_service;
+  this planner re-validates syntax + snapshot-descendant relationship
+  and never promotes by itself.
 - nuclei: httpx final URLs (2xx preferred), capped; same fallback.
+  NEVER receives promoted hosts directly (only via httpx observations,
+  which is the pre-existing httpx->nuclei chaining).
 
-Only host/url scope entries drive the pipeline. CIDR entries cannot be
-expanded safely in Phase 3 v1: a snapshot with no host/url entries ends
-the run with an explicit Finish (never a silent skip, never a guess).
+Only host/url scope entries drive the pipeline, except that a
+domain-only snapshot with a non-empty promoted set may still run the
+HTTPX stage (the Phase 4C domain -> discovery -> httpx flow). CIDR-only
+with no promoted hosts still ends with an explicit Finish.
 
 A stage completes on ANY observation for its tool (ok, error, or
 rejected) - the planner always advances, so runs terminate. Failures
@@ -35,6 +43,9 @@ from agent_core.schemas.state import AgentState
 NMAP_PIPELINE_PORTS = "80,443,3000,8000,8080"
 MAX_STAGE_TARGETS = 10
 MAX_PIPELINE_HOSTS = 10
+# Bound on run-local promoted hosts accepted by the planner (before the
+# final HTTPX merge, which is itself capped at MAX_STAGE_TARGETS).
+MAX_PROMOTED_HOSTS = 50
 
 _PROFILE_STAGES: dict[str, tuple[str, ...]] = {
     "recon": ("nmap", "httpx"),
@@ -132,6 +143,68 @@ def _httpx_urls(observations: list[Any]) -> list[str]:
     return (ok_urls + other_urls)[:MAX_STAGE_TARGETS]
 
 
+def sanitize_promoted_hosts(hosts: object, snapshot: object = None) -> list[str]:
+    """Deterministic hostname-only filter for a run-local promoted set.
+
+    Defense in depth behind discovery_service (which already guarantees
+    DNS-verified, asset-backed, descendant-validated hostnames): drop
+    anything that is not a valid DNS hostname, not a label-boundary
+    descendant of a snapshot parent, or an exact duplicate. IPs, URLs,
+    wildcards, CNAME/redirect-style values, and scanner blobs never
+    survive. Sorted output; capped at MAX_PROMOTED_HOSTS.
+
+    The planner itself never promotes: with ``snapshot=None`` only
+    syntax is checked; with a snapshot the descendant gate also
+    applies. Neither branch touches Project.scope, Scan.target_snapshot,
+    or any Policy.
+    """
+    from backend.services.subdomain_policy import is_within_domain, normalize_hostname
+
+    if not isinstance(hosts, (list, tuple)):
+        return []
+    parents: list[str] | None = None
+    if isinstance(snapshot, list):
+        from backend.services.subdomain_policy import snapshot_parents
+
+        parents = snapshot_parents(snapshot)
+        if not parents:
+            # Snapshot with no name-shaped parents (e.g. CIDR-only):
+            # nothing can be a valid descendant -> fail closed.
+            return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in hosts:
+        name = normalize_hostname(item)
+        if name is None or name in seen:
+            continue
+        if parents is not None and not any(is_within_domain(name, p) for p in parents):
+            continue
+        seen.add(name)
+        out.append(name)
+        if len(out) >= MAX_PROMOTED_HOSTS:
+            break
+    return sorted(out)
+
+
+def _promoted_web_urls(promoted_hosts: list[str]) -> list[str]:
+    """Run-local promoted hostnames as HTTPX seed URLs (``http://``)."""
+    return [f"http://{h}" for h in promoted_hosts or []]
+
+
+def _merge_httpx_targets(base: list[str], promoted_urls: list[str]) -> list[str]:
+    """Original targets first, then promoted; exact-dedup, capped."""
+    merged: list[str] = []
+    seen: set[str] = set()
+    for url in list(base or []) + list(promoted_urls or []):
+        if not isinstance(url, str) or not url or url in seen:
+            continue
+        seen.add(url)
+        merged.append(url)
+        if len(merged) >= MAX_STAGE_TARGETS:
+            break
+    return merged
+
+
 class PipelinePlanner:
     """Fixed real-tool pipeline; implements the Planner protocol."""
 
@@ -140,10 +213,15 @@ class PipelinePlanner:
         profile: str,
         snapshot: list[dict[str, Any]],
         max_steps: int = 12,
+        discovered_hosts: object = None,
     ) -> None:
         self.profile = profile if profile in _PROFILE_STAGES else "full"
         self.snapshot = list(snapshot or [])
         self.hosts = _snapshot_hosts(self.snapshot)
+        # Run-local promoted set for the HTTPX stage ONLY. Sanitized here
+        # (syntax + snapshot-descendant); never persisted, never used for
+        # nmap/nuclei targeting. Empty by default (backward compatible).
+        self.discovered_hosts = sanitize_promoted_hosts(discovered_hosts, self.snapshot)
         self.max_steps = max_steps
 
     def _done_tools(self, state: AgentState) -> set[str]:
@@ -183,14 +261,20 @@ class PipelinePlanner:
 
     def _stage_targets(self, tool: str, state: AgentState) -> list[str]:
         if tool == "nmap":
+            # Promoted discovery hosts NEVER enter nmap (Step 5 scope).
             return list(self.hosts)
         if tool == "httpx":
-            return (
+            base = (
                 _nmap_http_urls(state.observations)
                 or _snapshot_web_seeds(self.snapshot)
                 or [f"http://{h}" for h in self.hosts]
             )
+            if not base and not self.discovered_hosts:
+                return []
+            return _merge_httpx_targets(base, _promoted_web_urls(self.discovered_hosts))
         if tool == "nuclei":
+            # Promoted hosts NEVER enter nuclei directly; only via httpx
+            # observations through the pre-existing httpx->nuclei chaining.
             return (
                 _httpx_urls(state.observations)
                 or _snapshot_web_seeds(self.snapshot)
@@ -199,7 +283,7 @@ class PipelinePlanner:
         return []
 
     def decide(self, state: AgentState) -> Decision:
-        if not self.hosts:
+        if not self.hosts and not self.discovered_hosts:
             return Finish(
                 summary=(
                     "Phase 3 v1 supports host/url scope entries only; "

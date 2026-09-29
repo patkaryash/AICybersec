@@ -20,10 +20,12 @@ Phase 4A additions (foundation only, no new tools):
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 from typing import Any
 from urllib.parse import urlparse
 
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -359,26 +361,30 @@ def link_findings_to_assets(session: Session, *, scan) -> int:
 def apply_dns_enrichment(
     session: Session, *, scan, records: list[dict[str, Any]]
 ) -> int:
-    """Merge DNS records into matching host/subdomain asset attributes.
+    """Merge DNS records into matching host/subdomain/domain attributes.
 
     DATA ONLY: writes attributes.dns_a/dns_aaaa/dns_cname on assets whose
-    host exactly matches (case-insensitive). Unknown hosts are skipped.
-    Never touches scope, snapshots, or authorization state. Returns the
-    number of assets updated.
+    host exactly matches (case-insensitive). ``a``/``aaaa``/``cname``
+    aliases are accepted for DNSX output, while the existing ``dns_*``
+    names remain supported for older callers. Unknown hosts are skipped.
+    Valid A/AAAA data advances an existing ``unverified`` asset to
+    ``resolved``; CNAME-only data does not. Never touches scope,
+    snapshots, or authorization state. Returns the number of matching
+    assets enriched.
     """
-    updated = 0
+    updated_ids: set[Any] = set()
     for record in (records or [])[:MAX_DNS_RECORDS]:
         if not isinstance(record, dict):
             continue
         raw_host = record.get("host")
         if not isinstance(raw_host, str) or not raw_host.strip():
             continue
-        hostname = raw_host.strip().lower().rstrip(".")
-        enrichment: dict[str, list[str]] = {}
-        for key in DNS_ATTR_KEYS:
-            values = record.get(key)
-            if isinstance(values, list) and values:
-                enrichment[key] = [str(v)[:255] for v in values[:20]]
+        from backend.services.subdomain_policy import normalize_hostname
+
+        hostname = normalize_hostname(raw_host)
+        if hostname is None:
+            continue
+        enrichment, has_address = _normalize_dnsx_record(record)
         if not enrichment:
             continue
         rows = (
@@ -386,17 +392,154 @@ def apply_dns_enrichment(
             .filter(
                 Asset.scan_id == scan.id,
                 Asset.asset_type.in_(("host", "subdomain", "domain")),
-                Asset.host == hostname,
+                func.lower(Asset.host) == hostname,
             )
             .all()
         )
         for row in rows:
             attributes = dict(row.attributes or {})
-            attributes.update(enrichment)
+            for key, values in enrichment.items():
+                existing = _normalize_dns_values(attributes.get(key), key)
+                attributes[key] = _merge_dns_values(existing, values)
+            if has_address and attributes.get("verification_status") == "unverified":
+                attributes["verification_status"] = "resolved"
             row.attributes = _cap_strings(attributes)
-            updated += 1
+            updated_ids.add(row.id)
     session.flush()
-    return updated
+    return len(updated_ids)
+
+
+def _normalize_dns_values(value: Any, key: str) -> list[str]:
+    """Return bounded, valid, deterministic DNS values for one attribute."""
+    if not isinstance(value, list):
+        return []
+    out: set[str] = set()
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        text = item.strip()
+        if not text:
+            continue
+        if key == "dns_a":
+            try:
+                parsed = ipaddress.ip_address(text)
+            except ValueError:
+                continue
+            if parsed.version != 4:
+                continue
+            text = str(parsed)
+        elif key == "dns_aaaa":
+            try:
+                parsed = ipaddress.ip_address(text)
+            except ValueError:
+                continue
+            if parsed.version != 6:
+                continue
+            text = str(parsed)
+        elif key == "dns_cname":
+            from backend.services.subdomain_policy import normalize_hostname
+
+            text = normalize_hostname(text) or ""
+            if not text:
+                continue
+        else:
+            continue
+        out.add(text[:255])
+    return sorted(out)[:20]
+
+
+def _merge_dns_values(existing: list[str], incoming: list[str]) -> list[str]:
+    """Merge DNS values without order-dependent duplicates."""
+    return sorted(set(existing).union(incoming))[:20]
+
+
+def _normalize_dnsx_record(
+    record: dict[str, Any],
+) -> tuple[dict[str, list[str]], bool]:
+    """Map one bounded DNSX record to persistence attributes.
+
+    A/AAAA answers are accepted only when they are valid addresses of the
+    corresponding family. CNAME values are retained as data, but are never
+    resolved or used as lookup keys. The boolean reports whether this record
+    contains at least one valid A or AAAA answer.
+    """
+    aliases = {
+        "dns_a": ("dns_a", "a"),
+        "dns_aaaa": ("dns_aaaa", "aaaa"),
+        "dns_cname": ("dns_cname", "cname"),
+    }
+    enrichment: dict[str, list[str]] = {}
+    for destination, keys in aliases.items():
+        values: list[Any] = []
+        for key in keys:
+            raw = record.get(key)
+            if isinstance(raw, list):
+                values.extend(raw)
+        normalized = _normalize_dns_values(values, destination)
+        if normalized:
+            enrichment[destination] = normalized
+    return enrichment, bool(enrichment.get("dns_a") or enrichment.get("dns_aaaa"))
+
+
+def _dnsx_observation_data(observation: Any) -> tuple[dict[str, Any], set[str]]:
+    """Extract successful DNSX data and its trusted queried hostnames."""
+    source = tool = status = ok = None
+    if isinstance(observation, dict):
+        source = observation.get("source")
+        tool = observation.get("tool")
+        status = observation.get("status")
+        ok = observation.get("ok")
+        data = observation.get("data") if "data" in observation else observation
+    else:
+        source = getattr(observation, "source", None)
+        tool = getattr(observation, "tool", None)
+        status = getattr(observation, "status", None)
+        ok = getattr(observation, "ok", None)
+        data = getattr(observation, "data", None)
+    if source is not None and source != "tool":
+        return {}, set()
+    if tool is not None and tool != "dnsx":
+        return {}, set()
+    if status is not None and status != "ok":
+        return {}, set()
+    if ok is not None and ok is not True:
+        return {}, set()
+    if not isinstance(data, dict):
+        return {}, set()
+    from backend.services.subdomain_policy import normalize_hostname
+
+    queried: set[str] = set()
+    targets = data.get("targets")
+    if isinstance(targets, list):
+        for target in targets:
+            normalized = normalize_hostname(target)
+            if normalized is not None:
+                queried.add(normalized)
+    return data, queried
+
+
+def apply_dnsx_enrichment(session: Session, *, scan, observation: Any) -> int:
+    """Persist one successful DNSX ToolResult/Observation as data only.
+
+    The DNSX result's validated ``targets`` list is the only lookup-key
+    allowlist. Records for other hosts are ignored, and DNS values are never
+    interpreted as assets, authorization targets, or follow-up work.
+    """
+    data, queried = _dnsx_observation_data(observation)
+    records = data.get("records")
+    if not isinstance(records, list) or not queried:
+        return 0
+    bounded_records: list[dict[str, Any]] = []
+    from backend.services.subdomain_policy import normalize_hostname
+
+    for record in records[:MAX_DNS_RECORDS]:
+        if not isinstance(record, dict):
+            continue
+        host = normalize_hostname(record.get("host"))
+        if host is None or host not in queried:
+            continue
+        bounded_records.append({**record, "host": host})
+    return apply_dns_enrichment(session, scan=scan, records=bounded_records)
 
 
 def persist_finding(

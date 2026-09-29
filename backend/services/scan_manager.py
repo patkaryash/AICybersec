@@ -285,16 +285,83 @@ class ScanManager:
         )
         recorder = RunRecorder()
         registry = self._build_per_scan_registry(scan_id, entry.cancel, recorder)
+        validator = SafetyValidator(registry, policy)
+        # --- Phase 4C Step 4: deterministic discovery pre-stage -----------
+        # Runs in THIS worker thread (no new worker, no direct subprocess):
+        # Subfinder -> policy validation -> DNSX -> persistence, all through
+        # the per-scan registry/validator above. The promoted set stays
+        # run-local here (Step 5 planner wiring is deferred); persistent
+        # authorization (Project.scope, Scan.target_snapshot, Policy) is
+        # never mutated and resolve_scope() is never re-called with
+        # discovered names.
+        discovery_result = self._run_discovery_pre_stage(
+            scan_id=scan_id,
+            registry=registry,
+            validator=validator,
+            cancel=entry.cancel,
+        )
+        if discovery_result.cancelled or entry.cancel.is_set():
+            from types import SimpleNamespace
+
+            self._finish_scan(
+                scan_id,
+                SimpleNamespace(status="cancelled", error=None, observations=[]),
+                recorder,
+            )
+            return
+        logger.info(
+            "discovery pre-stage for scan %s: %d discovered, %d promoted (run-local)",
+            scan_id,
+            len(discovery_result.discovered),
+            len(discovery_result.promoted),
+        )
+        # --- Phase 4C Step 5 (corrected): promoted -> HTTPX ONLY -------
+        # ScanManager passes ONLY discovery_result.promoted (never
+        # discovered/unverified, never DNS IPs/CNAMEs) through the
+        # planner sanitizer. The planner merges it into the HTTPX stage
+        # only; nmap/nuclei targeting is unchanged. The runtime gate is
+        # a NARROW wrapper around the ORIGINAL validator: HTTPX calls
+        # whose hosts are originally authorized or eligible pass; EVERY
+        # other tool (nmap/nuclei/...) delegates byte-for-byte to the
+        # original validator, so promoted-only hosts stay rejected there
+        # unless independently authorized. Original Policy/validator
+        # objects are never mutated. The derived run-local Policy below
+        # exists ONLY for ToolContext (in-tool recheck); the gate is the
+        # wrapper, so its broader context list cannot authorize Nmap or
+        # Nuclei (rejected before any tool executes).
+        from backend.services.httpx_eligibility import (
+            PromotedHttpxValidator,
+            build_httpx_runtime_policy,
+        )
+        from backend.services.pipeline_planner import sanitize_promoted_hosts
+
+        eligible = sanitize_promoted_hosts(
+            getattr(discovery_result, "promoted", []), snapshot
+        )
         if entry.planner is not None:
             planner = entry.planner
+            runtime_policy = policy
+            runtime_validator = validator
         elif scan_mode == "agent":
             planner = build_planner(registry, allowed)
+            runtime_policy = policy
+            runtime_validator = validator
         else:
-            planner = PipelinePlanner(profile, snapshot, max_steps=max_steps)
+            planner = PipelinePlanner(
+                profile, snapshot, max_steps=max_steps, discovered_hosts=eligible
+            )
+            if eligible:
+                runtime_policy = build_httpx_runtime_policy(policy, eligible)
+                runtime_validator = PromotedHttpxValidator(
+                    base=validator, eligible_hosts=eligible
+                )
+            else:
+                runtime_policy = policy
+                runtime_validator = validator
         runtime = AgentRuntime(
             planner=planner,
             registry=registry,
-            validator=SafetyValidator(registry, policy),
+            validator=runtime_validator,
             store=JsonFileStore(self._runs_dir),
             events=[
                 DatabaseEventSink(
@@ -304,7 +371,7 @@ class ScanManager:
                     initiated_by=scan_mode,
                 )
             ],
-            policy=policy,
+            policy=runtime_policy,
         )
         state = runtime.new_state(goal, run_id=str(scan_id))
         final = runtime.execute(state, cancel=entry.cancel)
@@ -320,6 +387,7 @@ class ScanManager:
         as an execution path. The spill dir is a backend-controlled path
         from trusted UUIDs - never user input.
         """
+        from agent_core.tools.dnsx import DNSXTool
         from agent_core.tools.httpx import HTTPXTool
         from agent_core.tools.mocks import MockPortScan, MockWebProbe
         from agent_core.tools.nmap import NmapTool
@@ -339,7 +407,60 @@ class ScanManager:
         # The tool's resolver defaults to stdlib forward-DNS (same
         # semantics as the scope bridge); verification results are DATA.
         registry.register(SubfinderTool(runner=runner))
+        # Phase 4C Step 4: DNS enrichment (SAFE, scope-controlled).
+        # DiscoveryService invokes it with an isolated per-batch policy
+        # (exactly the validated batch); planner use stays gated by the
+        # snapshot-derived allowlist like every other tool.
+        registry.register(DNSXTool(runner=runner))
         return registry
+
+    def _run_discovery_pre_stage(self, *, scan_id: uuid.UUID, registry, validator, cancel: threading.Event):
+        """Deterministic Subfinder -> DNSX pre-stage (Phase 4C Step 4).
+
+        Runs synchronously in the scan's worker thread (no new worker, no
+        subprocess directly - all execution flows through ``registry`` via
+        ``DiscoveryService``, gated by ``validator``). Returns a run-local
+        ``DiscoveryResult`` whose ``promoted`` list is DATA ONLY: it never
+        mutates ``Project.scope``, ``Scan.target_snapshot``, the caller's
+        ``Policy``/``validator``, or any persistent authorization.
+
+        Fail-closed: any error returns an empty completed result so the
+        existing pipeline continues with snapshot-only targets. Cancelled
+        returns ``status == "cancelled"`` so the caller can skip the
+        pipeline and finish as cancelled.
+        """
+        from backend.services.discovery_service import DiscoveryResult, DiscoveryService
+
+        if cancel.is_set():
+            return DiscoveryResult(status="cancelled")
+        try:
+            with self._sessions() as session:
+                scan = session.get(Scan, scan_id)
+                if scan is None:
+                    logger.error("discovery: scan %s vanished before pre-stage", scan_id)
+                    return DiscoveryResult()
+                import copy as _copy
+
+                before_snapshot = _copy.deepcopy(list(scan.target_snapshot or []))
+                service = DiscoveryService(registry=registry, validator=validator)
+                result = service.run(
+                    session=session,
+                    scan=scan,
+                    cancel=cancel,
+                    run_id=str(scan_id),
+                )
+                if list(scan.target_snapshot or []) != before_snapshot:
+                    logger.error(
+                        "discovery mutated target_snapshot for scan %s; rolling back",
+                        scan_id,
+                    )
+                    session.rollback()
+                    return DiscoveryResult(errors=["target_snapshot mutated"])
+                session.commit()
+                return result
+        except Exception:
+            logger.exception("discovery pre-stage failed for scan %s", scan_id)
+            return DiscoveryResult(errors=["discovery failed"])
 
     def _finish_scan(self, scan_id: uuid.UUID, final, recorder: RunRecorder) -> None:
         """Terminal mapping + asset persistence + ToolRun enrichment."""
@@ -407,7 +528,7 @@ class ScanManager:
           ToolRun.status = cancelled (the tool itself reports error; it
           has no cancel concept); a timed-out run stays timeout.
         """
-        for tool in ("nmap", "httpx", "nuclei", "subfinder"):
+        for tool in ("nmap", "httpx", "nuclei", "subfinder", "dnsx"):
             records = recorder.records_for(tool)
             if not records:
                 continue
