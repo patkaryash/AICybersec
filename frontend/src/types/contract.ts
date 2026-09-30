@@ -224,6 +224,26 @@ export interface FindingOut {
 
 export type AssetType = 'host' | 'subdomain' | 'domain' | 'service' | 'url' | 'endpoint';
 
+export type VerificationStatus = 'unverified' | 'resolved' | 'nxdomain' | 'error';
+
+export interface AssetAttributes {
+  parent_domain?: string;
+  source?: string;
+  verification_status?: VerificationStatus | string;
+  dns_a?: string[];
+  dns_aaaa?: string[];
+  dns_cname?: string[];
+  protocol?: string;
+  service?: string;
+  status_code?: number;
+  title?: string;
+  tech?: string[];
+  source_page?: string;
+  crawl_depth?: number;
+  http_method?: string;
+  [key: string]: unknown;
+}
+
 export interface AssetOut {
   id: string;
   scan_id: string;
@@ -234,7 +254,7 @@ export interface AssetOut {
   port: number | null;
   scheme: string | null;
   parent_asset_id: string | null;
-  attributes: Record<string, unknown>;
+  attributes: AssetAttributes;
   source_tool: string;
   created_at: string;
   last_seen: string;

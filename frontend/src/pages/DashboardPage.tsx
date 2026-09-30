@@ -22,15 +22,16 @@ import ThreatGlobe from '../components/common/ThreatGlobe';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { scans, severityStats, loading, error, refreshData } = useScans();
+  const { scans, severityStats, totalAssets, isDemo, loading, error, refreshData } = useScans();
 
   const activeScans = scans.filter(
     (s) => s.status === 'running' || s.status === 'queued' || s.status === 'initializing'
   );
   const recentScans = scans.slice(0, 6);
 
-  // Derive unique monitored targets
+  // Use backend totalAssets as source of truth; use unique target count in demo mode
   const uniqueAssets = Array.from(new Set(scans.map((s) => s.target)));
+  const assetDisplayCount = isDemo ? uniqueAssets.length : totalAssets;
 
   if (loading) {
     return (
@@ -133,8 +134,8 @@ export const DashboardPage: React.FC = () => {
         />
         <StatCard
           title="Monitored Assets"
-          value={uniqueAssets.length}
-          subtitle="Unique target hosts & APIs"
+          value={assetDisplayCount}
+          subtitle="Discovered & monitored assets"
           icon={Globe}
           accentColor="purple"
         />

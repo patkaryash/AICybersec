@@ -31,6 +31,7 @@ interface ScanContextType {
   loading: boolean;
   error: string | null;
   severityStats: SeverityCount;
+  totalAssets: number;
   isDemo: boolean;
   createScan: (
     target: string,
@@ -61,6 +62,7 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [projects, setProjects] = useState<ProjectOut[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [totalAssets, setTotalAssets] = useState<number>(0);
   const [severityStats, setSeverityStats] = useState<SeverityCount>({
     critical: 0,
     high: 0,
@@ -94,6 +96,7 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setScans(allScans);
         setFindings(allFindings);
         setSeverityStats(stats);
+        setTotalAssets(allScans.length > 0 ? new Set(allScans.map((s) => s.target)).size : 0);
         setProjects([]);
       } else if (!isAuthenticated) {
         // No session (restore still pending, or logged out): never call
@@ -104,6 +107,7 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setScans([]);
         setFindings([]);
         setProjects([]);
+        setTotalAssets(0);
         setSeverityStats({
           critical: 0,
           high: 0,
@@ -123,6 +127,7 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const mappedScans = scansRes.items.map(mapScanOutToScan);
         setScans(mappedScans);
         setProjects(projectsRes.items);
+        setTotalAssets(typeof dash.total_assets === 'number' ? dash.total_assets : 0);
 
         // Fetch findings across scans (first 5 scans to avoid excessive requests)
         const activeOrRecentScans = scansRes.items.slice(0, 5);
@@ -260,6 +265,7 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         error,
         severityStats,
+        totalAssets,
         isDemo,
         createScan,
         stopScan,
