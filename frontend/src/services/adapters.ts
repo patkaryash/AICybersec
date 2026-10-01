@@ -60,6 +60,7 @@ export function mapFindingOutToFinding(out: FindingOut): Finding {
   return {
     id: out.id,
     scanId: out.scan_id,
+    assetId: out.asset_id ?? null,
     title: out.title,
     severity: out.scanner_severity as Severity,
     target: targetStr,

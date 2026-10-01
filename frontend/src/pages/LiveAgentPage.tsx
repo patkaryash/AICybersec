@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Clock,
@@ -16,6 +16,7 @@ import {
   Check,
   AlertCircle,
   Inbox,
+  Network,
 } from 'lucide-react';
 import { useScans } from '../context/ScanContext';
 import { useTimer } from '../hooks/useTimer';
@@ -26,17 +27,27 @@ import { DemoBanner } from '../components/common/DemoBanner';
 import { SCAN_PROFILES, Scan } from '../types/scan';
 import { eventService } from '../services/api/eventService';
 import { scanService as realScanService } from '../services/api/scanService';
+import { assetService } from '../services/api/assetService';
 import { mapScanOutToScan, mapRealEventsToTimeline } from '../services/adapters';
 import { AgentTimelineEvent } from '../types/agent';
+import { AssetOut } from '../types/contract';
+import { Finding } from '../types/finding';
+import { FindingDetailModal } from '../components/common/FindingDetailModal';
+import { AttackSurfaceTree } from '../components/assets/AttackSurfaceTree';
 
 export const LiveAgentPage: React.FC = () => {
   const { scanId } = useParams<{ scanId: string }>();
   const navigate = useNavigate();
-  const { scans, stopScan, refreshData, isDemo } = useScans();
+  const { scans, findings, stopScan, refreshData, isDemo } = useScans();
 
   const [copiedId, setCopiedId] = useState(false);
   const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
   const [realEvents, setRealEvents] = useState<AgentTimelineEvent[]>([]);
+  const [activeTab, setActiveTab] = useState<'timeline' | 'assets'>('timeline');
+  const [scanAssets, setScanAssets] = useState<AssetOut[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState<boolean>(false);
+  const [assetsError, setAssetsError] = useState<string | null>(null);
+  const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
 
   // Context snapshot (loaded once per refreshData call) + live override.
   const contextScan =
@@ -125,6 +136,107 @@ export const LiveAgentPage: React.FC = () => {
   }, [scan?.id, isSimulated]);
 
   const events = isSimulated ? simulatedEvents : realEvents;
+
+  // Findings linked to this scan
+  const scanFindings = useMemo(() => {
+    return findings.filter((f) => f.scanId === scan?.id);
+  }, [findings, scan?.id]);
+
+  // Fetch discovered assets for this scan
+  useEffect(() => {
+    if (!scan) return;
+
+    if (isSimulated) {
+      const demoProjectId = scan.projectId || 'demo-project';
+      const demoAssets: AssetOut[] = [
+        {
+          id: `${scan.id}-root`,
+          scan_id: scan.id,
+          project_id: demoProjectId,
+          asset_type: 'domain',
+          value: scan.target,
+          host: scan.target,
+          port: null,
+          scheme: null,
+          parent_asset_id: null,
+          attributes: {
+            verification_status: 'resolved',
+            source: 'scope',
+          },
+          source_tool: 'scope',
+          created_at: scan.startedAt,
+          last_seen: scan.startedAt,
+        },
+        {
+          id: `${scan.id}-sub1`,
+          scan_id: scan.id,
+          project_id: demoProjectId,
+          asset_type: 'subdomain',
+          value: `api.${scan.target}`,
+          host: `api.${scan.target}`,
+          port: null,
+          scheme: null,
+          parent_asset_id: `${scan.id}-root`,
+          attributes: {
+            parent_domain: scan.target,
+            source: 'subfinder',
+            verification_status: 'resolved',
+            dns_a: ['10.0.0.15'],
+          },
+          source_tool: 'subfinder',
+          created_at: scan.startedAt,
+          last_seen: scan.startedAt,
+        },
+        {
+          id: `${scan.id}-sub2`,
+          scan_id: scan.id,
+          project_id: demoProjectId,
+          asset_type: 'subdomain',
+          value: `staging.${scan.target}`,
+          host: `staging.${scan.target}`,
+          port: null,
+          scheme: null,
+          parent_asset_id: `${scan.id}-root`,
+          attributes: {
+            parent_domain: scan.target,
+            source: 'subfinder',
+            verification_status: 'unverified',
+            dns_cname: [`lb.${scan.target}`],
+          },
+          source_tool: 'subfinder',
+          created_at: scan.startedAt,
+          last_seen: scan.startedAt,
+        },
+      ];
+      setScanAssets(demoAssets);
+      return;
+    }
+
+    let isMounted = true;
+    const loadAssets = async () => {
+      try {
+        setAssetsLoading((prev) => (scanAssets.length === 0 ? true : prev));
+        const res = await assetService.listAssetsForScan(scan.id, { pageSize: 100 });
+        if (isMounted) {
+          setScanAssets(res.items);
+          setAssetsError(null);
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          setAssetsError(err instanceof Error ? err.message : 'Failed to load assets');
+        }
+      } finally {
+        if (isMounted) setAssetsLoading(false);
+      }
+    };
+
+    loadAssets();
+    const interval = isRunning ? setInterval(loadAssets, 7000) : undefined;
+    return () => {
+      isMounted = false;
+      if (interval) clearInterval(interval);
+    };
+  }, [scan?.id, scan?.target, scan?.projectId, scan?.startedAt, isSimulated, isRunning]);
 
   const handleCopyScanId = () => {
     if (!scan) return;
@@ -230,6 +342,19 @@ export const LiveAgentPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Discovered Assets Tile */}
+            <div className="bg-sentinel-bg px-3.5 py-2 rounded-lg border border-sentinel-border flex items-center gap-2.5">
+              <Network size={16} className={scanAssets.length > 0 ? 'text-cyan-400' : 'text-sentinel-dim'} />
+              <div>
+                <span className="text-[10px] text-sentinel-dim block uppercase font-mono tracking-wider">
+                  Assets
+                </span>
+                <span className="font-mono text-sm font-bold text-sentinel-text">
+                  {scanAssets.length}
+                </span>
+              </div>
+            </div>
+
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
               {isSimulated && isRunning && (
@@ -283,18 +408,48 @@ export const LiveAgentPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Timeline Section */}
+      {/* Execution Trace & Attack Surface Tabs Section */}
       <Card
         header={
-          <div className="flex items-center justify-between w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
             <div className="flex items-center gap-2">
-              <Cpu size={18} className="text-sentinel-cyan" />
-              <span className="text-base font-semibold text-sentinel-text">Autonomous AI Agent Execution Trace</span>
+              <button
+                type="button"
+                onClick={() => setActiveTab('timeline')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'timeline'
+                    ? 'bg-cyan-950/80 border border-cyan-800 text-sentinel-cyan shadow-sm'
+                    : 'text-sentinel-muted hover:text-sentinel-text hover:bg-sentinel-elevated'
+                }`}
+              >
+                <Cpu size={14} />
+                <span>AI Execution Trace</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-sentinel-surface border border-sentinel-border text-sentinel-dim">
+                  {events.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('assets')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'assets'
+                    ? 'bg-cyan-950/80 border border-cyan-800 text-sentinel-cyan shadow-sm'
+                    : 'text-sentinel-muted hover:text-sentinel-text hover:bg-sentinel-elevated'
+                }`}
+              >
+                <Network size={14} />
+                <span>Discovered Attack Surface</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                  {scanAssets.length}
+                </span>
+              </button>
             </div>
+
             {isRunning && (
               <span className="text-xs font-mono text-cyan-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                Live Reasoning Loop Active
+                Live Telemetry Active
               </span>
             )}
             {scan.status === 'queued' && (
@@ -305,9 +460,21 @@ export const LiveAgentPage: React.FC = () => {
             )}
           </div>
         }
-        subtitle="Chronological sequence of autonomous decisions, tool executions, and security findings"
+        subtitle={
+          activeTab === 'timeline'
+            ? 'Chronological sequence of autonomous decisions, tool executions, and security findings'
+            : 'Discovered domains, subdomains, hosts, and services with verified DNS attributes and linked findings'
+        }
       >
-        {events.length === 0 ? (
+        {activeTab === 'assets' ? (
+          <AttackSurfaceTree
+            assets={scanAssets}
+            findings={scanFindings}
+            isLoading={assetsLoading}
+            error={assetsError}
+            onSelectFinding={setSelectedFinding}
+          />
+        ) : events.length === 0 ? (
           <div className="py-12 text-center space-y-3">
             <div className="w-12 h-12 rounded-xl bg-sentinel-elevated border border-sentinel-border flex items-center justify-center text-sentinel-dim mx-auto">
               <Inbox size={22} />
@@ -437,6 +604,15 @@ export const LiveAgentPage: React.FC = () => {
           </div>
         )}
       </Card>
+
+      {/* Finding Detail Modal if opened from Attack Surface */}
+      {selectedFinding && (
+        <FindingDetailModal
+          finding={selectedFinding}
+          isOpen={Boolean(selectedFinding)}
+          onClose={() => setSelectedFinding(null)}
+        />
+      )}
     </div>
   );
 };

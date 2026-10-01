@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Finding, FindingStatus } from '../../types/finding';
 import { SeverityBadge } from './SeverityBadge';
-import { X, ExternalLink, Copy, Check, Terminal, ShieldAlert, Cpu, Wrench, FileCode, CheckCircle } from 'lucide-react';
+import { X, ExternalLink, Copy, Check, Terminal, ShieldAlert, Cpu, Wrench, FileCode } from 'lucide-react';
 
 interface FindingDetailModalProps {
   finding: Finding | null;
@@ -71,11 +71,24 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
 
           {/* Quick Target / Asset bar */}
           <div className="mt-4 pt-3 border-t border-sentinel-border/50 flex flex-wrap items-center justify-between text-xs gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sentinel-dim">Asset:</span>
-              <code className="text-sentinel-cyan bg-sentinel-elevated px-2 py-0.5 rounded border border-sentinel-border font-mono">
-                {finding.asset}
-              </code>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sentinel-dim">Target:</span>
+                <code className="text-sentinel-text bg-sentinel-elevated px-2 py-0.5 rounded border border-sentinel-border font-mono">
+                  {finding.target}
+                </code>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sentinel-dim">Asset:</span>
+                <code className="text-sentinel-cyan bg-sentinel-elevated px-2 py-0.5 rounded border border-sentinel-border font-mono">
+                  {finding.asset}
+                </code>
+                {finding.assetId && (
+                  <span className="text-[10px] text-sentinel-dim font-mono" title={`Asset ID: ${finding.assetId}`}>
+                    ({finding.assetId.slice(0, 8)}...)
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sentinel-dim">Tool:</span>
