@@ -70,6 +70,9 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
           </div>
 
           {/* Quick Target / Asset bar */}
+                  </div>
+
+          {/* Quick Target / Asset bar */}
           <div className="mt-4 pt-3 border-t border-[#D8E1EB] flex flex-wrap items-center justify-between text-xs gap-3">
             <div className="flex items-center gap-2">
               <span className="text-[#64748B]">Asset:</span>
@@ -77,6 +80,18 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
                 {finding.asset}
               </code>
             </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[#64748B]">Tool:</span>
+              <span className="font-mono text-[#0B1220] bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                {finding.tool}
+              </span>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex items-center gap-2 mt-4 pt-2 border-t border-[#D8E1EB]">
+          </div>
             <div className="flex items-center gap-2">
               <span className="text-[#64748B]">Tool:</span>
               <span className="font-mono text-[#0B1220] bg-slate-100 px-2 py-0.5 rounded border border-slate-200">

@@ -7,6 +7,7 @@ export type FindingStatus = 'open' | 'accepted_risk' | 'resolved' | 'false_posit
 export interface Finding {
   id: string;
   scanId: string;
+  assetId?: string | null;
   title: string;
   severity: Severity;
   target: string;

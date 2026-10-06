@@ -14,6 +14,7 @@ import {
   Inbox,
   X,
   Radio,
+  Network,
 } from 'lucide-react';
 import { useScans } from '../context/ScanContext';
 import { useTimer } from '../hooks/useTimer';
@@ -22,20 +23,29 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { SCAN_PROFILES, Scan } from '../types/scan';
 import { eventService } from '../services/api/eventService';
 import { scanService as realScanService } from '../services/api/scanService';
+import { assetService } from '../services/api/assetService';
 import { mapScanOutToScan, mapRealEventsToTimeline } from '../services/adapters';
 import { AgentTimelineEvent } from '../types/agent';
 import { containerVariants, itemVariants } from '../lib/motionVariants';
+import { AssetOut } from '../types/contract';
+import { Finding } from '../types/finding';
+import { FindingDetailModal } from '../components/common/FindingDetailModal';
+import { AttackSurfaceTree } from '../components/assets/AttackSurfaceTree';
 
 export const LiveAgentPage: React.FC = () => {
   const { scanId } = useParams<{ scanId: string }>();
   const navigate = useNavigate();
-  const { scans, stopScan, refreshData, isDemo } = useScans();
+  const { scans, findings, stopScan, refreshData, isDemo } = useScans();
 
   const [copiedId, setCopiedId] = useState(false);
   const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
   const [realEvents, setRealEvents] = useState<AgentTimelineEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<AgentTimelineEvent | null>(null);
-
+  const [activeTab, setActiveTab] = useState<'timeline' | 'assets'>('timeline');
+  const [scanAssets, setScanAssets] = useState<AssetOut[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState<boolean>(false);
+  const [assetsError, setAssetsError] = useState<string | null>(null);
+  const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   // Context snapshot (loaded once per refreshData call) + live override.
   const contextScan =
     scans.find((s) => s.id === scanId) ||
@@ -124,6 +134,107 @@ export const LiveAgentPage: React.FC = () => {
   }, [activeScanId, isSimulated]);
 
   const events = isSimulated ? simulatedEvents : realEvents;
+
+  // Findings linked to this scan
+  const scanFindings = useMemo(() => {
+    return findings.filter((f) => f.scanId === scan?.id);
+  }, [findings, scan?.id]);
+
+  // Fetch discovered assets for this scan
+  useEffect(() => {
+    if (!scan) return;
+
+    if (isSimulated) {
+      const demoProjectId = scan.projectId || 'demo-project';
+      const demoAssets: AssetOut[] = [
+        {
+          id: `${scan.id}-root`,
+          scan_id: scan.id,
+          project_id: demoProjectId,
+          asset_type: 'domain',
+          value: scan.target,
+          host: scan.target,
+          port: null,
+          scheme: null,
+          parent_asset_id: null,
+          attributes: {
+            verification_status: 'resolved',
+            source: 'scope',
+          },
+          source_tool: 'scope',
+          created_at: scan.startedAt,
+          last_seen: scan.startedAt,
+        },
+        {
+          id: `${scan.id}-sub1`,
+          scan_id: scan.id,
+          project_id: demoProjectId,
+          asset_type: 'subdomain',
+          value: `api.${scan.target}`,
+          host: `api.${scan.target}`,
+          port: null,
+          scheme: null,
+          parent_asset_id: `${scan.id}-root`,
+          attributes: {
+            parent_domain: scan.target,
+            source: 'subfinder',
+            verification_status: 'resolved',
+            dns_a: ['10.0.0.15'],
+          },
+          source_tool: 'subfinder',
+          created_at: scan.startedAt,
+          last_seen: scan.startedAt,
+        },
+        {
+          id: `${scan.id}-sub2`,
+          scan_id: scan.id,
+          project_id: demoProjectId,
+          asset_type: 'subdomain',
+          value: `staging.${scan.target}`,
+          host: `staging.${scan.target}`,
+          port: null,
+          scheme: null,
+          parent_asset_id: `${scan.id}-root`,
+          attributes: {
+            parent_domain: scan.target,
+            source: 'subfinder',
+            verification_status: 'unverified',
+            dns_cname: [`lb.${scan.target}`],
+          },
+          source_tool: 'subfinder',
+          created_at: scan.startedAt,
+          last_seen: scan.startedAt,
+        },
+      ];
+      setScanAssets(demoAssets);
+      return;
+    }
+
+    let isMounted = true;
+    const loadAssets = async () => {
+      try {
+        setAssetsLoading((prev) => (scanAssets.length === 0 ? true : prev));
+        const res = await assetService.listAssetsForScan(scan.id, { pageSize: 100 });
+        if (isMounted) {
+          setScanAssets(res.items);
+          setAssetsError(null);
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          setAssetsError(err instanceof Error ? err.message : 'Failed to load assets');
+        }
+      } finally {
+        if (isMounted) setAssetsLoading(false);
+      }
+    };
+
+    loadAssets();
+    const interval = isRunning ? setInterval(loadAssets, 7000) : undefined;
+    return () => {
+      isMounted = false;
+      if (interval) clearInterval(interval);
+    };
+  }, [scan?.id, scan?.target, scan?.projectId, scan?.startedAt, isSimulated, isRunning]);
 
   const handleCopyScanId = () => {
     if (!scan) return;
@@ -294,19 +405,29 @@ export const LiveAgentPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-start gap-3 lg:border-l lg:pl-4 lg:border-slate-200">
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <Clock size={14} className={isRunning ? 'text-[#1D4ED8] animate-pulse' : 'text-[#64748B]'} />
+                  <Clock
+                    size={14}
+                    className={isRunning ? 'text-[#1D4ED8] animate-pulse' : 'text-[#64748B]'}
+                  />
                   <span className="font-mono text-sm font-bold text-[#0B1220]">
                     {scan.status === 'queued' ? 'Queued' : formattedTime}
                   </span>
                 </div>
+
                 <div className="flex items-center gap-2">
-                  <Bug size={14} className={scan.findingsCount.total > 0 ? 'text-[#DC2626]' : 'text-[#64748B]'} />
+                  <Bug
+                    size={14}
+                    className={
+                      scan.findingsCount.total > 0
+                        ? 'text-[#DC2626]'
+                        : 'text-[#64748B]'
+                    }
+                  />
                   <span className="font-mono text-sm font-bold text-[#0B1220]">
                     {scan.findingsCount.total} findings
                   </span>
                 </div>
               </div>
-
               <div className="flex items-center gap-2 flex-wrap">
                 {isSimulated && isRunning && (
                   <>
@@ -448,15 +569,16 @@ export const LiveAgentPage: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold text-[#0B1220]">Agent Activity</h3>
-              <p className="text-xs text-[#475569] mt-0.5">Chronological sequence of autonomous decisions and tool executions</p>
-            </div>
-            {isRunning && (
+              <p className="text-xs text-[#475569] mt-0.5">
+                Chronological sequence of autonomous decisions and tool executions
+              </p>
+
+              {isRunning && (
               <span className="text-xs font-mono text-[#1D4ED8] flex items-center gap-1.5 font-semibold">
                 <span className="w-2 h-2 rounded-full bg-[#1D4ED8] animate-ping" />
                 Live
               </span>
             )}
-          </div>
 
           {events.length === 0 ? (
             <div className="py-8 text-center space-y-2">
@@ -639,7 +761,16 @@ export const LiveAgentPage: React.FC = () => {
             aria-hidden="true"
           />
         )}
-      </AnimatePresence>
+       </AnimatePresence>
+
+      {/* Finding Detail Modal if opened from Attack Surface */}
+      {selectedFinding && (
+        <FindingDetailModal
+          finding={selectedFinding}
+          isOpen={Boolean(selectedFinding)}
+          onClose={() => setSelectedFinding(null)}
+        />
+      )}
     </motion.div>
   );
 };

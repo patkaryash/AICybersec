@@ -28,7 +28,7 @@ const ThreatGlobe = lazy(() => import('../components/common/ThreatGlobe'));
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { scans, severityStats, loading, error, refreshData } = useScans();
+  const { scans, severityStats, totalAssets, isDemo, loading, error, refreshData } = useScans();
 
   const activeScans = useMemo(
     () =>
@@ -59,6 +59,7 @@ export const DashboardPage: React.FC = () => {
         dotClass: 'bg-rose-400 animate-pulse',
       };
     }
+
     if (severityStats.high > 0) {
       return {
         level: 'Elevated Exposure',
@@ -71,6 +72,7 @@ export const DashboardPage: React.FC = () => {
         dotClass: 'bg-amber-400',
       };
     }
+
     if (severityStats.total > 0) {
       return {
         level: 'Moderate Notice',
@@ -83,6 +85,7 @@ export const DashboardPage: React.FC = () => {
         dotClass: 'bg-cyan-400',
       };
     }
+
     return {
       level: 'Perimeter Secure',
       description: 'Zero vulnerabilities detected across monitored attack surfaces',
@@ -96,6 +99,9 @@ export const DashboardPage: React.FC = () => {
   }, [severityStats]);
 
   const activeScan = activeScans[0];
+
+  // Use backend totalAssets as source of truth; use unique target count in demo mode
+  const assetDisplayCount = isDemo ? uniqueAssets.length : totalAssets;
 
   if (loading) {
     return (
@@ -228,8 +234,14 @@ export const DashboardPage: React.FC = () => {
         />
         <StatCard
           title="Monitored Assets"
-          value={uniqueAssets.length}
-          subtitle="Target hosts & endpoints in scope"
+        <StatCard
+          title="Monitored Assets"
+          value={assetDisplayCount}
+          subtitle="Discovered & monitored assets"
+          icon={Globe}
+          accentColor="purple"
+          badge={{ text: `${scans.length} Scans`, variant: 'default' }}
+        />
           icon={Globe}
           accentColor="purple"
           badge={{ text: `${scans.length} Scans`, variant: 'default' }}
