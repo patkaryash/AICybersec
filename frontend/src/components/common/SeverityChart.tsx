@@ -9,11 +9,11 @@ export const SeverityChart: React.FC<SeverityChartProps> = ({ stats }) => {
   const total = stats.total || 0;
 
   const tiers = [
-    { key: 'critical', label: 'Critical', count: stats.critical, color: 'bg-rose-500', text: 'text-rose-400', bg: 'bg-rose-950/40', border: 'border-rose-800/50' },
-    { key: 'high', label: 'High', count: stats.high, color: 'bg-orange-500', text: 'text-orange-400', bg: 'bg-orange-950/40', border: 'border-orange-800/50' },
-    { key: 'medium', label: 'Medium', count: stats.medium, color: 'bg-amber-500', text: 'text-amber-400', bg: 'bg-amber-950/40', border: 'border-amber-800/50' },
-    { key: 'low', label: 'Low', count: stats.low, color: 'bg-sky-500', text: 'text-sky-400', bg: 'bg-sky-950/40', border: 'border-sky-800/50' },
-    { key: 'info', label: 'Info', count: stats.info, color: 'bg-indigo-500', text: 'text-indigo-400', bg: 'bg-indigo-950/40', border: 'border-indigo-800/50' },
+    { key: 'critical', label: 'Critical', count: stats.critical, color: 'bg-[#DC2626]', text: 'text-[#DC2626]', bg: 'bg-rose-50/70', border: 'border-rose-200/80' },
+    { key: 'high', label: 'High', count: stats.high, color: 'bg-[#D97706]', text: 'text-[#D97706]', bg: 'bg-amber-50/70', border: 'border-amber-200/80' },
+    { key: 'medium', label: 'Medium', count: stats.medium, color: 'bg-[#CA8A04]', text: 'text-[#CA8A04]', bg: 'bg-yellow-50/70', border: 'border-yellow-200/80' },
+    { key: 'low', label: 'Low', count: stats.low, color: 'bg-[#059669]', text: 'text-[#059669]', bg: 'bg-emerald-50/70', border: 'border-emerald-200/80' },
+    { key: 'info', label: 'Info', count: stats.info, color: 'bg-[#64748B]', text: 'text-[#64748B]', bg: 'bg-slate-50/70', border: 'border-slate-200/80' },
   ];
 
   const getPercentage = (count: number) => {
@@ -30,17 +30,17 @@ export const SeverityChart: React.FC<SeverityChartProps> = ({ stats }) => {
     <div className="space-y-4">
       {/* Segmented Distribution Bar */}
       <div>
-        <div className="flex justify-between items-baseline text-xs text-sentinel-muted mb-2">
-          <span className="font-medium tracking-wide">Threat Exposure Distribution</span>
-          <span className="text-sentinel-text font-semibold tabular-nums">{total} Recorded Findings</span>
+        <div className="flex justify-between items-baseline text-xs text-slate-500 mb-2 font-mono">
+          <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-600">Exposure Spectrum</span>
+          <span className="text-slate-900 font-bold tabular-nums">{total} Verified Findings</span>
         </div>
 
         {total === 0 ? (
-          <div className="h-2.5 w-full bg-sentinel-elevated rounded-full overflow-hidden border border-sentinel-border flex items-center justify-center">
-            <span className="text-[10px] text-sentinel-dim">No vulnerabilities detected</span>
+          <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200 flex items-center justify-center">
+            <span className="text-[10px] text-slate-400 font-mono">No vulnerabilities detected</span>
           </div>
         ) : (
-          <div className="h-2.5 w-full bg-sentinel-elevated rounded-full overflow-hidden border border-sentinel-border flex">
+          <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200 flex shadow-inner">
             {tiers.map((tier) => {
               const pct = barWidth(tier.count);
               if (pct === 0) return null;
@@ -62,14 +62,14 @@ export const SeverityChart: React.FC<SeverityChartProps> = ({ stats }) => {
         {tiers.map((tier) => (
           <div
             key={tier.key}
-            className={`p-3 rounded-xl border ${tier.border} ${tier.bg} flex flex-col justify-between transition-colors`}
+            className={`p-3 rounded-xl border ${tier.border} ${tier.bg} flex flex-col justify-between transition-all hover:shadow-sm`}
           >
             <div className="flex items-center justify-between">
               <span className={`text-xs font-semibold ${tier.text}`}>{tier.label}</span>
-              <span className="text-[11px] text-sentinel-dim tabular-nums">{getPercentage(tier.count)}%</span>
+              <span className="text-[11px] text-slate-500 font-mono tabular-nums">{getPercentage(tier.count)}%</span>
             </div>
-            <div className="mt-1.5 flex items-baseline">
-              <span className="text-[22px] leading-none font-bold tabular-nums text-sentinel-text">{tier.count}</span>
+            <div className="mt-2 flex items-baseline">
+              <span className="text-2xl leading-none font-bold tabular-nums text-slate-900 tracking-tight">{tier.count}</span>
             </div>
           </div>
         ))}

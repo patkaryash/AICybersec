@@ -4,63 +4,100 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: 'class',
   theme: {
     extend: {
       colors: {
+        background: '#F4F7FB',       // Platinum / Cool-White foundation
+        surface: {
+          DEFAULT: '#FFFFFF',        // Pure white surface
+          elevated: '#FFFFFF',       // Elevated surface
+          muted: '#EEF3F8',          // Surface muted / subtle cool gray
+          border: '#D8E1EB',         // Thin cool-gray border
+        },
+        primary: {
+          DEFAULT: '#0B1220',        // Primary Headings
+          navy: '#0B1F3A',           // Brand Primary Deep Navy
+          sapphire: '#1D4ED8',       // Sapphire Primary Accent
+          'sapphire-hover': '#1E40AF',
+          indigo: '#4F46E5',         // Supporting Indigo
+        },
+        brand: {
+          navy: '#0B1F3A',
+          sapphire: '#1D4ED8',
+          'sapphire-hover': '#1E40AF',
+          indigo: '#4F46E5',
+        },
+        text: {
+          primary: '#0B1220',        // Primary headings / titles
+          secondary: '#475569',      // Body text
+          muted: '#64748B',          // Metadata / subtle text
+        },
+        threat: {
+          critical: '#DC2626',       // Semantic Critical
+          warning: '#D97706',        // Semantic High / Amber
+          success: '#059669',        // Semantic Low / Green
+          medium: '#CA8A04',         // Semantic Medium / Yellow
+        },
+        // Sentinel compatibility tokens mapped to unified architecture
         sentinel: {
-          bg: '#0A0E17',         // deep dark navy/near-black background
-          surface: '#111827',    // card and panel surface
-          elevated: '#172236',   // hovered/elevated surface
-          subtle: '#1F2E47',     // soft highlight/active state
-          border: '#1E293B',     // borders
-          'border-light': '#334155',
-          text: '#F1F5F9',       // primary text
-          muted: '#94A3B8',      // secondary text
-          dim: '#64748B',        // tertiary / placeholder text
-          cyan: '#06B6D4',       // primary cyber accent (sparingly)
-          'cyan-hover': '#22D3EE',
-          'cyan-subtle': 'rgba(6, 182, 212, 0.1)',
-          purple: '#8B5CF6',     // secondary accent (sparingly)
-          'purple-hover': '#A78BFA',
-          'purple-subtle': 'rgba(139, 92, 246, 0.1)',
+          bg: '#F4F7FB',
+          surface: '#FFFFFF',
+          elevated: '#EEF3F8',
+          subtle: '#EEF3F8',
+          border: '#D8E1EB',
+          'border-light': '#E2E8F0',
+          text: '#0B1220',
+          muted: '#475569',
+          dim: '#64748B',
+          cyan: '#1D4ED8',           // Mapped to Sapphire
+          'cyan-hover': '#1E40AF',
+          'cyan-subtle': 'rgba(29, 78, 216, 0.08)',
+          purple: '#4F46E5',         // Mapped to Indigo
+          'purple-hover': '#4338CA',
+          'purple-subtle': 'rgba(79, 70, 229, 0.08)',
+          navy: '#0B1F3A',
+          sapphire: '#1D4ED8',
         },
         severity: {
           critical: {
-            bg: '#450A0A',
-            border: '#991B1B',
-            text: '#FCA5A5',
-            badge: '#EF4444',
+            bg: '#FEF2F2',
+            border: '#FECACA',
+            text: '#B91C1C',
+            badge: '#DC2626',
           },
           high: {
-            bg: '#431407',
-            border: '#9A3412',
-            text: '#FDBA74',
-            badge: '#F97316',
+            bg: '#FFF7ED',
+            border: '#FED7AA',
+            text: '#C2410C',
+            badge: '#D97706',
           },
           medium: {
-            bg: '#422006',
-            border: '#854D0E',
-            text: '#FDE047',
-            badge: '#EAB308',
+            bg: '#FEFCE8',
+            border: '#FEF08A',
+            text: '#A16207',
+            badge: '#CA8A04',
           },
           low: {
-            bg: '#082F49',
-            border: '#075985',
-            text: '#7DD3FC',
-            badge: '#38BDF8',
+            bg: '#F0FDF4',
+            border: '#BBF7D0',
+            text: '#15803D',
+            badge: '#059669',
           },
           info: {
-            bg: '#1E1B4B',
-            border: '#3730A3',
-            text: '#C7D2FE',
-            badge: '#818CF8',
+            bg: '#F8FAFC',
+            border: '#E2E8F0',
+            text: '#475569',
+            badge: '#64748B',
           },
         }
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', 'monospace'],
+      },
+      boxShadow: {
+        'card': '0 1px 3px 0 rgba(11, 18, 32, 0.04), 0 1px 2px -1px rgba(11, 18, 32, 0.04)',
+        'card-hover': '0 10px 15px -3px rgba(11, 18, 32, 0.06), 0 4px 6px -4px rgba(11, 18, 32, 0.04)',
       },
     },
   },

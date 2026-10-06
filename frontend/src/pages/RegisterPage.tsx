@@ -61,44 +61,44 @@ export const RegisterPage: React.FC = () => {
   const displayError = clientError || error;
 
   return (
-    <div className="min-h-screen bg-sentinel-bg text-sentinel-text flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#F4F7FB] text-[#0B1220] flex items-center justify-center p-4">
       {/* Background Ambience */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-cyan-900/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[300px] bg-purple-900/10 rounded-full blur-[100px]" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-blue-400/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[300px] bg-indigo-400/5 rounded-full blur-[100px]" />
       </div>
 
       <div className="relative w-full max-w-md">
         {/* Brand Card Header */}
         <div className="text-center mb-6 space-y-2">
-          <div className="inline-flex w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-600/20 border border-cyan-500/40 items-center justify-center text-sentinel-cyan shadow-lg shadow-cyan-950/50 mb-1">
+          <div className="inline-flex w-12 h-12 rounded-xl bg-[#1D4ED8] items-center justify-center text-white shadow-md shadow-[#1D4ED8]/25 mb-1">
             <Shield size={26} className="stroke-[2.2]" />
           </div>
           <div className="flex items-center justify-center gap-1.5">
-            <h1 className="text-2xl font-bold tracking-tight text-sentinel-text">
-              CyberSec <span className="text-sentinel-cyan">AI</span>
+            <h1 className="text-2xl font-bold tracking-tight text-[#0B1220]">
+              Sentinel <span className="text-[#1D4ED8]">AI</span>
             </h1>
-            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold bg-cyan-950/80 text-sentinel-cyan border border-cyan-800/60">
+            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold bg-blue-50 text-[#1D4ED8] border border-blue-200">
               Registration
             </span>
           </div>
-          <p className="text-xs text-sentinel-muted">
-            Request Authorized Laboratory Operator Credentials
+          <p className="text-xs text-[#475569]">
+            Autonomous Security Operations &amp; Lab Access Registration
           </p>
         </div>
 
         {/* Register Form Card */}
-        <div className="bg-sentinel-surface/90 border border-sentinel-border rounded-2xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
+        <div className="bg-white/90 backdrop-blur-md border border-slate-200/80 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
           <div className="space-y-1">
-            <h2 className="text-base font-semibold text-sentinel-text">Create Security Account</h2>
-            <p className="text-xs text-sentinel-dim">
+            <h2 className="text-base font-bold text-[#0B1220]">Create Security Account</h2>
+            <p className="text-xs text-[#64748B]">
               New accounts receive operator role for authorized security assessments.
             </p>
           </div>
 
           {displayError && (
-            <div className="p-3 rounded-lg border border-rose-900/60 bg-rose-950/40 text-xs text-rose-300 flex items-start gap-2.5">
-              <AlertTriangle size={15} className="shrink-0 mt-0.5 text-rose-400" />
+            <div className="p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-xs text-rose-800 flex items-start gap-2.5 shadow-2xs">
+              <AlertTriangle size={15} className="shrink-0 mt-0.5 text-rose-600" />
               <div className="flex-1 leading-relaxed">{displayError}</div>
             </div>
           )}
@@ -107,7 +107,7 @@ export const RegisterPage: React.FC = () => {
             <div>
               <label
                 htmlFor="register-name"
-                className="block text-xs font-mono font-medium text-sentinel-muted mb-1.5 uppercase tracking-wider"
+                className="block text-xs font-mono font-bold text-[#475569] mb-1.5 uppercase tracking-wider"
               >
                 Operator Name (Optional)
               </label>
@@ -120,9 +120,9 @@ export const RegisterPage: React.FC = () => {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Security Specialist"
-                  className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-sentinel-bg border border-sentinel-border text-xs sm:text-sm text-sentinel-text font-mono placeholder:text-sentinel-dim focus:outline-none focus:border-sentinel-cyan transition-colors"
+                  className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-[#F4F7FB] border border-[#D8E1EB] text-xs sm:text-sm text-[#0B1220] font-mono placeholder:text-[#64748B] focus:outline-none focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/25 transition-all"
                 />
-                <div className="absolute left-3 top-3 text-sentinel-dim">
+                <div className="absolute left-3 top-3 text-[#64748B]">
                   <User size={15} />
                 </div>
               </div>
@@ -131,9 +131,9 @@ export const RegisterPage: React.FC = () => {
             <div>
               <label
                 htmlFor="register-email"
-                className="block text-xs font-mono font-medium text-sentinel-muted mb-1.5 uppercase tracking-wider"
+                className="block text-xs font-mono font-bold text-[#475569] mb-1.5 uppercase tracking-wider"
               >
-                Email Address <span className="text-rose-400">*</span>
+                Email Address <span className="text-rose-600">*</span>
               </label>
               <div className="relative">
                 <input
@@ -145,9 +145,9 @@ export const RegisterPage: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="specialist@corp.internal"
-                  className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-sentinel-bg border border-sentinel-border text-xs sm:text-sm text-sentinel-text font-mono placeholder:text-sentinel-dim focus:outline-none focus:border-sentinel-cyan transition-colors"
+                  className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-[#F4F7FB] border border-[#D8E1EB] text-xs sm:text-sm text-[#0B1220] font-mono placeholder:text-[#64748B] focus:outline-none focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/25 transition-all"
                 />
-                <div className="absolute left-3 top-3 text-sentinel-dim">
+                <div className="absolute left-3 top-3 text-[#64748B]">
                   <Mail size={15} />
                 </div>
               </div>
@@ -156,9 +156,9 @@ export const RegisterPage: React.FC = () => {
             <div>
               <label
                 htmlFor="register-password"
-                className="block text-xs font-mono font-medium text-sentinel-muted mb-1.5 uppercase tracking-wider"
+                className="block text-xs font-mono font-bold text-[#475569] mb-1.5 uppercase tracking-wider"
               >
-                Password (min 8 chars) <span className="text-rose-400">*</span>
+                Password (min 8 chars) <span className="text-rose-600">*</span>
               </label>
               <div className="relative">
                 <input
@@ -170,15 +170,15 @@ export const RegisterPage: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full pl-9 pr-10 py-2.5 rounded-lg bg-sentinel-bg border border-sentinel-border text-xs sm:text-sm text-sentinel-text font-mono placeholder:text-sentinel-dim focus:outline-none focus:border-sentinel-cyan transition-colors"
+                  className="w-full pl-9 pr-10 py-2.5 rounded-lg bg-[#F4F7FB] border border-[#D8E1EB] text-xs sm:text-sm text-[#0B1220] font-mono placeholder:text-[#64748B] focus:outline-none focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/25 transition-all"
                 />
-                <div className="absolute left-3 top-3 text-sentinel-dim">
+                <div className="absolute left-3 top-3 text-[#64748B]">
                   <Lock size={15} />
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-3 text-sentinel-dim hover:text-sentinel-text"
+                  className="absolute right-3 top-3 text-[#64748B] hover:text-[#0B1220]"
                 >
                   {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
@@ -188,9 +188,9 @@ export const RegisterPage: React.FC = () => {
             <div>
               <label
                 htmlFor="register-confirm-password"
-                className="block text-xs font-mono font-medium text-sentinel-muted mb-1.5 uppercase tracking-wider"
+                className="block text-xs font-mono font-bold text-[#475569] mb-1.5 uppercase tracking-wider"
               >
-                Confirm Password <span className="text-rose-400">*</span>
+                Confirm Password <span className="text-rose-600">*</span>
               </label>
               <div className="relative">
                 <input
@@ -202,9 +202,9 @@ export const RegisterPage: React.FC = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full pl-9 pr-10 py-2.5 rounded-lg bg-sentinel-bg border border-sentinel-border text-xs sm:text-sm text-sentinel-text font-mono placeholder:text-sentinel-dim focus:outline-none focus:border-sentinel-cyan transition-colors"
+                  className="w-full pl-9 pr-10 py-2.5 rounded-lg bg-[#F4F7FB] border border-[#D8E1EB] text-xs sm:text-sm text-[#0B1220] font-mono placeholder:text-[#64748B] focus:outline-none focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/25 transition-all"
                 />
-                <div className="absolute left-3 top-3 text-sentinel-dim">
+                <div className="absolute left-3 top-3 text-[#64748B]">
                   <Lock size={15} />
                 </div>
               </div>
@@ -213,11 +213,11 @@ export const RegisterPage: React.FC = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-sentinel-cyan text-sentinel-bg font-semibold text-xs tracking-wider uppercase hover:bg-sentinel-cyan-hover transition-colors shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#1D4ED8] text-white font-semibold text-xs tracking-wider uppercase hover:bg-[#1E40AF] transition-colors shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-sentinel-bg border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   <span>Registering Profile...</span>
                 </>
               ) : (
@@ -229,11 +229,11 @@ export const RegisterPage: React.FC = () => {
             </button>
           </form>
 
-          <div className="pt-2 border-t border-sentinel-border/60 text-center text-xs">
-            <span className="text-sentinel-muted">Already registered? </span>
+          <div className="pt-2 border-t border-[#D8E1EB] text-center text-xs">
+            <span className="text-[#475569]">Already registered? </span>
             <Link
               to="/login"
-              className="text-sentinel-cyan hover:underline font-medium font-mono"
+              className="text-[#1D4ED8] hover:underline font-semibold font-mono"
             >
               Sign In Here
             </Link>

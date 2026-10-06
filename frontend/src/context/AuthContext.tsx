@@ -83,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     restoreSession();
   }, [logout]);
 
-  const login = async (credentials: LoginRequest): Promise<void> => {
+  const login = useCallback(async (credentials: LoginRequest): Promise<void> => {
     setError(null);
     try {
       const tokenRes = await authService.login(credentials);
@@ -102,9 +102,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setError(message);
       throw err;
     }
-  };
+  }, []);
 
-  const register = async (data: RegisterRequest): Promise<void> => {
+  const register = useCallback(async (data: RegisterRequest): Promise<void> => {
     setError(null);
     try {
       await authService.register(data);
@@ -118,24 +118,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setError(message);
       throw err;
     }
-  };
+  }, [login]);
 
-  const clearError = () => setError(null);
+  const clearError = useCallback(() => setError(null), []);
+
+  const contextValue = React.useMemo<AuthContextType>(
+    () => ({
+      user,
+      token,
+      isAuthenticated: Boolean(user && token),
+      isLoading,
+      error,
+      login,
+      register,
+      logout,
+      clearError,
+    }),
+    [user, token, isLoading, error, login, register, logout, clearError]
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        isAuthenticated: Boolean(user && token),
-        isLoading,
-        error,
-        login,
-        register,
-        logout,
-        clearError,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

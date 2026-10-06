@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -21,12 +21,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { scans, isDemo } = useScans();
   const location = useLocation();
 
-  const activeScans = scans.filter(
-    (s) => s.status === 'running' || s.status === 'queued' || s.status === 'initializing'
+  const activeScans = useMemo(() => 
+    scans.filter(
+      (s) => s.status === 'running' || s.status === 'queued' || s.status === 'initializing'
+    ),
+    [scans]
   );
-  const activeScan = activeScans[0] || scans[0];
+  const activeScan = useMemo(() => activeScans[0] || scans[0], [activeScans, scans]);
 
-  const navItems = [
+  const navItems = useMemo(() => [
     {
       to: '/',
       label: 'Dashboard',
@@ -58,7 +61,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       icon: History,
       badge: scans.length.toString(),
     },
-  ];
+  ], [activeScan, activeScans.length, scans.length]);
+
+  const handleNavClick = useCallback(() => {
+    if (isOpen) onClose();
+  }, [isOpen, onClose]);
 
   return (
     <>
@@ -79,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       >
         {/* Brand Header */}
         <div className="h-16 px-5 border-b border-sentinel-border flex items-center justify-between">
-          <NavLink to="/" className="flex items-center gap-2.5 group" onClick={onClose}>
+          <NavLink to="/" className="flex items-center gap-2.5 group" onClick={handleNavClick}>
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-600/20 border border-cyan-500/30 flex items-center justify-center text-sentinel-cyan group-hover:border-cyan-400 transition-colors shadow-sm">
               <Shield size={20} className="stroke-[2.2]" />
             </div>
@@ -120,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               <NavLink
                 key={item.to}
                 to={item.to}
-                onClick={onClose}
+                onClick={handleNavClick}
                 className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all group ${
                   isActive
                     ? 'bg-sentinel-cyan/10 text-sentinel-cyan border border-sentinel-cyan/30 shadow-sm'
