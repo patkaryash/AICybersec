@@ -17,44 +17,50 @@ export const SeverityBadge: React.FC<SeverityBadgeProps> = ({
     critical: {
       label: 'Critical',
       icon: ShieldAlert,
-      classes: 'bg-rose-950/70 border-rose-700/80 text-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.15)]',
-      iconClass: 'text-rose-400',
+      classes: 'bg-rose-50/90 border-rose-200/90 text-[#DC2626]',
+      iconClass: 'text-[#DC2626] animate-pulse',
+      isPulse: true,
     },
     high: {
       label: 'High',
       icon: AlertTriangle,
-      classes: 'bg-orange-950/70 border-orange-700/80 text-orange-300 shadow-[0_0_12px_rgba(249,115,22,0.15)]',
-      iconClass: 'text-orange-400',
+      classes: 'bg-amber-50/90 border-amber-200/90 text-[#D97706]',
+      iconClass: 'text-[#D97706]',
+      isPulse: false,
     },
     medium: {
       label: 'Medium',
       icon: AlertCircle,
-      classes: 'bg-amber-950/60 border-amber-700/80 text-amber-300',
-      iconClass: 'text-amber-400',
+      classes: 'bg-yellow-50/90 border-yellow-200/90 text-[#CA8A04]',
+      iconClass: 'text-[#CA8A04]',
+      isPulse: false,
     },
     low: {
       label: 'Low',
       icon: Info,
-      classes: 'bg-sky-950/60 border-sky-700/80 text-sky-300',
-      iconClass: 'text-sky-400',
+      classes: 'bg-emerald-50/90 border-emerald-200/90 text-[#059669]',
+      iconClass: 'text-[#059669]',
+      isPulse: false,
     },
     info: {
       label: 'Info',
       icon: HelpCircle,
-      classes: 'bg-indigo-950/60 border-indigo-700/80 text-indigo-300',
-      iconClass: 'text-indigo-400',
+      classes: 'bg-slate-100 border-slate-200 text-[#64748B]',
+      iconClass: 'text-[#64748B]',
+      isPulse: false,
     },
   }[severity] || {
     label: severity,
     icon: Info,
-    classes: 'bg-slate-900 border-slate-700 text-slate-300',
-    iconClass: 'text-slate-400',
+    classes: 'bg-slate-100 border-slate-200 text-[#64748B]',
+    iconClass: 'text-[#64748B]',
+    isPulse: false,
   };
 
   const sizeClasses = {
-    sm: 'text-xs px-2 py-0.5 gap-1',
-    md: 'text-xs px-2.5 py-1 gap-1.5 font-medium',
-    lg: 'text-sm px-3 py-1.5 gap-2 font-medium',
+    sm: 'text-xs px-2 py-0.5 gap-1 font-semibold',
+    md: 'text-xs px-2.5 py-1 gap-1.5 font-semibold',
+    lg: 'text-sm px-3 py-1.5 gap-2 font-semibold',
   }[size];
 
   const iconSizes = {
@@ -67,7 +73,7 @@ export const SeverityBadge: React.FC<SeverityBadgeProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center rounded-md border uppercase tracking-wider font-mono ${config.classes} ${sizeClasses}`}
+      className={`inline-flex items-center rounded-md border uppercase tracking-wider font-mono ${config.classes} ${sizeClasses} ${config.isPulse ? 'animate-pulse' : ''}`}
       role="status"
       aria-label={`Severity level: ${config.label}`}
     >

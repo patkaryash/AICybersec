@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Menu,
@@ -30,7 +30,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
     (s) => s.status === 'running' || s.status === 'queued' || s.status === 'initializing'
   ).length;
 
-  const getPageInfo = () => {
+  const pageInfo = useMemo(() => {
     const path = location.pathname;
     if (path === '/') {
       return { title: 'Operations Dashboard', subtitle: 'Real-time telemetry, threat overview, and recent assessments' };
@@ -39,20 +39,18 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
       return { title: 'New Penetration Test', subtitle: 'Target specification, assessment profile selection, and ethical authorization' };
     }
     if (path.startsWith('/agent')) {
-      return { title: 'Live AI Agent Telemetry', subtitle: 'Autonomous execution loop, decision tracing, and tool activity' };
+      return { title: 'Live AI Agent', subtitle: 'Autonomous execution loop, decision tracing, and tool activity' };
     }
     if (path === '/findings') {
-      return { title: 'Vulnerability Findings', subtitle: 'Verified security weaknesses, evidence logs, and remediation guidance' };
+      return { title: 'Vulnerabilities', subtitle: 'Verified security weaknesses, evidence logs, and remediation guidance' };
     }
     if (path === '/history') {
-      return { title: 'Scan History & Audits', subtitle: 'Comprehensive archive of historical penetration testing runs' };
+      return { title: 'Scan History', subtitle: 'Comprehensive archive of historical penetration testing runs' };
     }
     return { title: 'CyberSec AI', subtitle: 'AI-Assisted Penetration Testing Platform' };
-  };
+  }, [location.pathname]);
 
-  const pageInfo = getPageInfo();
-
-  const handleReset = async () => {
+  const handleReset = useCallback(async () => {
     if (window.confirm('Reset all scans and findings back to initial demo seeds?')) {
       setResetting(true);
       await resetDemoData();
@@ -60,12 +58,12 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
       setShowResetSuccess(true);
       setTimeout(() => setShowResetSuccess(false), 2500);
     }
-  };
+  }, [resetDemoData]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
     navigate('/login');
-  };
+  }, [logout, navigate]);
 
   return (
     <header className="h-16 px-4 sm:px-6 bg-sentinel-surface/80 border-b border-sentinel-border flex items-center justify-between sticky top-0 z-30 backdrop-blur-md">

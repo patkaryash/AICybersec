@@ -174,108 +174,138 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // left over from the login page's demo bypass): exit demo mode so the
     // user sees live backend data, not mock telemetry.
     if (isDemo && isAuthenticated) {
-      toggleDemoMode(false);
+      queueMicrotask(() => {
+        toggleDemoMode(false);
+      });
       return;
     }
     refreshData();
   }, [refreshData, isDemo, authLoading, isAuthenticated, toggleDemoMode]);
 
-  const createScan = async (
-    target: string,
-    profile: ScanProfile,
-    goal?: string,
-    projectId?: string
-  ): Promise<Scan> => {
-    if (isDemo) {
-      const newScan = await mockScanService.createScan({ target, profile, goal });
-      await refreshData();
-      return newScan;
-    }
+  const createScan = useCallback(
+    async (
+      target: string,
+      profile: ScanProfile,
+      goal?: string,
+      projectId?: string
+    ): Promise<Scan> => {
+      if (isDemo) {
+        const newScan = await mockScanService.createScan({ target, profile, goal });
+        await refreshData();
+        return newScan;
+      }
 
-    // REAL API: Resolve or create project with target in scope
-    let targetProjectId = projectId;
-    if (!targetProjectId) {
-      const scopeEntry = inferScopeFromTarget(target);
-      const newProj = await realProjectService.createProject({
-        name: `Target: ${scopeEntry.value}`,
-        description: `Automated assessment project for ${target}`,
-        scope: [scopeEntry],
+      // REAL API: Resolve or create project with target in scope
+      let targetProjectId = projectId;
+      if (!targetProjectId) {
+        const scopeEntry = inferScopeFromTarget(target);
+        const newProj = await realProjectService.createProject({
+          name: `Target: ${scopeEntry.value}`,
+          description: `Automated assessment project for ${target}`,
+          scope: [scopeEntry],
+        });
+        targetProjectId = newProj.id;
+      }
+
+      // Map profile string to valid backend profile ('recon' | 'web' | 'full')
+      const apiProfile =
+        profile === 'web_assessment' ? 'web' : profile === 'full_assessment' ? 'full' : profile;
+
+      const createdOut = await realScanService.createScan({
+        project_id: targetProjectId,
+        profile: apiProfile,
+        goal: goal || undefined,
       });
-      targetProjectId = newProj.id;
-    }
 
-    // Map profile string to valid backend profile ('recon' | 'web' | 'full')
-    const apiProfile =
-      profile === 'web_assessment' ? 'web' : profile === 'full_assessment' ? 'full' : profile;
+      const newScan = mapScanOutToScan(createdOut);
+      setScans((prev) => [newScan, ...prev]);
+      return newScan;
+    },
+    [isDemo, refreshData]
+  );
 
-    const createdOut = await realScanService.createScan({
-      project_id: targetProjectId,
-      profile: apiProfile,
-      goal: goal || undefined,
-    });
-
-    const newScan = mapScanOutToScan(createdOut);
-    setScans((prev) => [newScan, ...prev]);
-    return newScan;
-  };
-
-  const stopScan = async (id: string): Promise<void> => {
-    if (isDemo) {
-      await mockScanService.stopScan(id);
-    } else {
-      const updatedOut = await realScanService.cancelScan(id);
-      const updated = mapScanOutToScan(updatedOut);
-      setScans((prev) => prev.map((s) => (s.id === id ? updated : s)));
-    }
-    await refreshData();
-  };
-
-  const updateFindingStatus = async (
-    id: string,
-    status: Finding['status']
-  ): Promise<void> => {
-    if (isDemo) {
-      await mockFindingsService.updateFindingStatus(id, status);
+  const stopScan = useCallback(
+    async (id: string): Promise<void> => {
+      if (isDemo) {
+        await mockScanService.stopScan(id);
+      } else {
+        const updatedOut = await realScanService.cancelScan(id);
+        const updated = mapScanOutToScan(updatedOut);
+        setScans((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      }
       await refreshData();
-    } else {
-      // Backend Phase 2 contract: findings are read-only scanner evidence
-      // Update local state for optimistic UI review
-      setFindings((prev) =>
-        prev.map((f) => (f.id === id ? { ...f, status } : f))
-      );
-    }
-  };
+    },
+    [isDemo, refreshData]
+  );
 
-  const resetDemoData = async (): Promise<void> => {
+  const updateFindingStatus = useCallback(
+    async (id: string, status: Finding['status']): Promise<void> => {
+      if (isDemo) {
+        await mockFindingsService.updateFindingStatus(id, status);
+        await refreshData();
+      } else {
+        // Backend Phase 2 contract: findings are read-only scanner evidence
+        // Update local state for optimistic UI review
+        setFindings((prev) =>
+          prev.map((f) => (f.id === id ? { ...f, status } : f))
+        );
+      }
+    },
+    [isDemo, refreshData]
+  );
+
+  const resetDemoData = useCallback(async (): Promise<void> => {
     if (!isDemo) return;
     setLoading(true);
     await mockScanService.resetToDefaults();
     await mockFindingsService.resetToDefaults();
     await refreshData();
-  };
+  }, [isDemo, refreshData]);
 
-  const clearError = () => setError(null);
+  const clearError = useCallback(() => setError(null), []);
 
-  return (
-    <ScanContext.Provider
-      value={{
-        scans,
-        findings,
-        projects,
-        loading,
-        error,
-        severityStats,
-        totalAssets,
-        isDemo,
-        createScan,
-        stopScan,
-        resetDemoData,
-        refreshData,
-        updateFindingStatus,
-        toggleDemoMode,
-        clearError,
-      }}
-    >
+  const contextValue = React.useMemo<ScanContextType>(
+    () => ({
+      scans,
+      findings,
+      projects,
+      loading,
+      error,
+      severityStats,
+      totalAssets,
+      isDemo,
+      createScan,
+      stopScan,
+      resetDemoData,
+      refreshData,
+      updateFindingStatus,
+      toggleDemoMode,
+      clearError,
+    }),
+    [
+      scans,
+      findings,
+      projects,
+      loading,
+      error,
+      severityStats,
+      totalAssets,
+      isDemo,
+      createScan,
+      stopScan,
+      resetDemoData,
+      refreshData,
+      updateFindingStatus,
+      toggleDemoMode,
+      clearError,
+    ]
+  );
+
+   return (
+    <ScanContext.Provider value={contextValue}>
+      {children}
+    </ScanContext.Provider>
+  );
       {children}
     </ScanContext.Provider>
   );
