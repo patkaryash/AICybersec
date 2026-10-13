@@ -23,59 +23,58 @@ export const StatCard: React.FC<StatCardProps> = ({
 }) => {
   const accentStyles = {
     cyan: {
-      iconBg: 'bg-blue-50 border-blue-200 text-[#1D4ED8]',
+      iconBg: 'bg-[#18181B] border-zinc-800 text-zinc-200',
     },
     purple: {
-      iconBg: 'bg-indigo-50 border-indigo-200 text-[#4F46E5]',
+      iconBg: 'bg-[#18181B] border-zinc-800 text-zinc-200',
     },
     rose: {
-      iconBg: 'bg-rose-50 border-rose-200 text-[#DC2626]',
+      iconBg: 'bg-red-950/40 border-red-900/60 text-red-400',
     },
     amber: {
-      iconBg: 'bg-amber-50 border-amber-200 text-[#D97706]',
+      iconBg: 'bg-amber-950/40 border-amber-900/60 text-amber-400',
     },
     emerald: {
-      iconBg: 'bg-emerald-50 border-emerald-200 text-[#059669]',
+      iconBg: 'bg-emerald-950/40 border-emerald-900/60 text-emerald-400',
     },
   }[accentColor];
 
   const badgeStyles = {
-    default: 'border-[#D8E1EB] bg-[#EEF3F8] text-[#475569]',
-    success: 'border-emerald-200 bg-emerald-50 text-[#059669]',
-    warning: 'border-amber-200 bg-amber-50 text-[#D97706]',
-    danger: 'border-rose-200 bg-rose-50 text-[#DC2626]',
+    default: 'border-zinc-700 bg-zinc-800 text-zinc-300',
+    success: 'border-emerald-850 bg-emerald-950/60 border border-emerald-800/80 text-emerald-400',
+    warning: 'border-amber-850 bg-amber-950/60 border border-amber-800/80 text-amber-400',
+    danger: 'border-red-850 bg-red-950/60 border border-red-800/80 text-red-400',
   }[(badge?.variant ?? 'default') as 'default' | 'success' | 'warning' | 'danger'];
 
   return (
-    <div className="bg-white/90 backdrop-blur-md border border-slate-200/80 rounded-xl p-5 shadow-sm hover:shadow-md hover:border-slate-300/90 transition-all duration-200 flex flex-col justify-between group">
+    <div className="bg-[#121214] border border-zinc-800 rounded-2xl p-5 shadow-xl hover:border-zinc-700 transition-all duration-200 flex flex-col justify-between group">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-[#475569] font-mono">
+        <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400">
           {title}
         </span>
-        <div className={`p-2.5 rounded-lg border ${accentStyles.iconBg} transition-transform duration-200 group-hover:scale-105 shadow-2xs`}>
+        <div className={`p-2.5 rounded-xl border ${accentStyles.iconBg} transition-transform duration-200 group-hover:scale-105 shadow-sm`}>
           <Icon size={17} aria-hidden="true" />
         </div>
       </div>
 
       <div className="mt-4 flex items-baseline justify-between gap-2">
-        <span className={`text-3xl font-bold tracking-tight text-[#0B1220] ${
-          typeof value === 'number' ? 'font-mono tabular-nums' : ''
+        <span className={`text-3xl font-bold tracking-tight text-white font-mono ${
+          typeof value === 'number' ? 'tabular-nums' : ''
         }`}>
           {value}
         </span>
         {badge && (
-          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${badgeStyles}`}>
+          <span className={`text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md border ${badgeStyles}`}>
             {badge.text}
           </span>
         )}
       </div>
 
       {subtitle && (
-        <p className="text-xs text-[#64748B] mt-2">
+        <p className="text-xs text-zinc-400 mt-2">
           {subtitle}
         </p>
       )}
     </div>
   );
 };
-

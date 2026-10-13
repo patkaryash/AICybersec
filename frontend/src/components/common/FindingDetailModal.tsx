@@ -35,34 +35,34 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex justify-end transition-opacity">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex justify-end transition-opacity">
       {/* Drawer Container */}
       <div
-        className="w-full max-w-2xl bg-white border-l border-[#D8E1EB] min-h-screen flex flex-col shadow-2xl animate-in slide-in-from-right duration-300"
+        className="w-full max-w-2xl bg-[#121214] border-l border-zinc-800 min-h-screen flex flex-col shadow-2xl animate-in slide-in-from-right duration-300 text-zinc-100"
         role="dialog"
         aria-modal="true"
         aria-labelledby="finding-modal-title"
       >
         {/* Header */}
-        <div className="p-6 border-b border-[#D8E1EB] bg-slate-50/80 sticky top-0 z-10 backdrop-blur-md">
+        <div className="p-6 border-b border-zinc-800 bg-[#121214] sticky top-0 z-10 backdrop-blur-md">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-2">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <SeverityBadge severity={finding.severity} size="md" />
-                <span className="text-xs font-mono text-[#64748B] bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                <span className="text-xs font-mono text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-700/80">
                   {finding.id}
                 </span>
-                <span className="text-xs px-2 py-0.5 rounded font-mono border border-blue-200 bg-blue-50 text-[#1D4ED8] font-medium">
-                  Synthetic Telemetry
+                <span className="text-xs px-2 py-0.5 rounded font-mono border border-zinc-700 bg-zinc-800/60 text-zinc-300 font-medium">
+                  Verified Finding
                 </span>
               </div>
-              <h2 id="finding-modal-title" className="text-lg font-bold text-[#0B1220] leading-snug">
+              <h2 id="finding-modal-title" className="text-lg font-bold text-white leading-snug">
                 {finding.title}
               </h2>
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg text-[#64748B] hover:text-[#0B1220] hover:bg-slate-200/60 transition-colors"
+              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
               aria-label="Close details"
             >
               <X size={20} />
@@ -70,38 +70,24 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
           </div>
 
           {/* Quick Target / Asset bar */}
-                  </div>
-
-          {/* Quick Target / Asset bar */}
-          <div className="mt-4 pt-3 border-t border-[#D8E1EB] flex flex-wrap items-center justify-between text-xs gap-3">
+          <div className="mt-4 pt-3 border-t border-zinc-800 flex flex-wrap items-center justify-between text-xs gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-[#64748B]">Asset:</span>
-              <code className="text-[#1D4ED8] bg-blue-50/60 px-2 py-0.5 rounded border border-blue-200/60 font-mono font-semibold">
+              <span className="text-zinc-500 font-mono">Asset:</span>
+              <code className="text-zinc-200 bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-700/80 font-mono font-medium">
                 {finding.asset}
               </code>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-[#64748B]">Tool:</span>
-              <span className="font-mono text-[#0B1220] bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+              <span className="text-zinc-500 font-mono">Tool:</span>
+              <span className="font-mono text-zinc-300 bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-700/80">
                 {finding.tool}
               </span>
             </div>
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center gap-2 mt-4 pt-2 border-t border-[#D8E1EB]">
-          </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[#64748B]">Tool:</span>
-              <span className="font-mono text-[#0B1220] bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                {finding.tool}
-              </span>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex items-center gap-2 mt-4 pt-2 border-t border-[#D8E1EB]">
+          <div className="flex items-center gap-2 mt-4 pt-2 border-t border-zinc-800">
             {[
               { id: 'overview', label: 'Overview', icon: ShieldAlert },
               { id: 'evidence', label: 'Evidence', icon: Terminal },
@@ -116,8 +102,8 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-blue-50 text-[#1D4ED8] border border-blue-200 font-semibold shadow-2xs'
-                      : 'text-[#475569] hover:text-[#0B1220] hover:bg-slate-100'
+                      ? 'bg-zinc-100 text-zinc-900 font-semibold shadow-xs'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
                   }`}
                 >
                   <Icon size={14} />
@@ -134,19 +120,19 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
             <div className="space-y-6">
               {/* Description */}
               <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-[#475569] uppercase tracking-wider font-mono">
+                <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono">
                   Vulnerability Description
                 </h4>
-                <p className="text-sm text-[#0B1220] leading-relaxed bg-[#EEF3F8]/50 p-4 rounded-xl border border-[#D8E1EB]">
+                <p className="text-sm text-zinc-200 leading-relaxed bg-[#18181B] p-4 rounded-xl border border-zinc-800">
                   {finding.description}
                 </p>
               </div>
 
               {/* Status Update Control */}
-              <div className="p-4 rounded-xl border border-[#D8E1EB] bg-white space-y-3 shadow-2xs">
+              <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181B] space-y-3 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-[#0B1220]">Triage & Remediation Status</span>
-                  <span className="text-xs font-mono capitalize px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-[#1D4ED8] font-medium">
+                  <span className="text-xs font-semibold text-zinc-200">Triage & Remediation Status</span>
+                  <span className="text-xs font-mono capitalize px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-medium">
                     Current: {finding.status.replace('_', ' ')}
                   </span>
                 </div>
@@ -157,8 +143,8 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
                       onClick={() => onStatusChange && onStatusChange(finding.id, opt.value)}
                       className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-all ${
                         finding.status === opt.value
-                          ? 'bg-[#1D4ED8] text-white border-[#1D4ED8] font-semibold shadow-2xs'
-                          : 'border-[#D8E1EB] bg-slate-50 text-[#475569] hover:text-[#0B1220] hover:bg-slate-100'
+                          ? 'bg-zinc-100 text-zinc-900 border-zinc-100 font-semibold shadow-xs'
+                          : 'border-zinc-800 bg-[#121214] text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'
                       }`}
                     >
                       {opt.label}
@@ -169,31 +155,31 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
 
               {/* Meta details grid */}
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3.5 rounded-xl border border-[#D8E1EB] bg-[#EEF3F8]/50 space-y-1">
-                  <span className="text-[#64748B]">Confidence Score</span>
-                  <p className="font-mono text-[#0B1220] font-semibold capitalize">{finding.confidence}</p>
+                <div className="p-3.5 rounded-xl border border-zinc-800 bg-[#18181B] space-y-1">
+                  <span className="text-zinc-500 font-mono">Confidence Score</span>
+                  <p className="font-mono text-zinc-200 font-semibold capitalize">{finding.confidence}</p>
                 </div>
-                <div className="p-3.5 rounded-xl border border-[#D8E1EB] bg-[#EEF3F8]/50 space-y-1">
-                  <span className="text-[#64748B]">Detection Timestamp</span>
-                  <p className="font-mono text-[#0B1220]">{new Date(finding.detectedAt).toLocaleString()}</p>
+                <div className="p-3.5 rounded-xl border border-zinc-800 bg-[#18181B] space-y-1">
+                  <span className="text-zinc-500 font-mono">Detection Timestamp</span>
+                  <p className="font-mono text-zinc-200">{new Date(finding.detectedAt).toLocaleString()}</p>
                 </div>
               </div>
 
               {/* References */}
               {finding.references && finding.references.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-[#475569] uppercase tracking-wider font-mono">
+                  <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono">
                     Standards & Security References
                   </h4>
                   <ul className="space-y-1.5">
                     {finding.references.map((ref, idx) => (
                       <li key={idx} className="flex items-center gap-2 text-xs">
-                        <ExternalLink size={12} className="text-[#1D4ED8] shrink-0" />
+                        <ExternalLink size={12} className="text-zinc-400 shrink-0" />
                         <a
                           href={ref}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[#1D4ED8] hover:underline truncate font-mono"
+                          className="text-zinc-300 hover:text-white hover:underline truncate font-mono"
                         >
                           {ref}
                         </a>
@@ -210,18 +196,18 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
               {finding.evidence.request && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#475569] uppercase tracking-wider font-mono">
-                      Synthetic HTTP Request Payload
+                    <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono">
+                      HTTP Request Payload
                     </span>
                     <button
                       onClick={() => handleCopy(finding.evidence.request || '', 'req')}
-                      className="text-xs text-[#64748B] hover:text-[#1D4ED8] flex items-center gap-1 transition-colors"
+                      className="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1 transition-colors"
                     >
-                      {copiedSection === 'req' ? <Check size={12} className="text-[#059669]" /> : <Copy size={12} />}
+                      {copiedSection === 'req' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                       <span>{copiedSection === 'req' ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
-                  <pre className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-rose-300 overflow-x-auto whitespace-pre leading-relaxed shadow-inner">
+                  <pre className="p-3.5 bg-[#09090B] border border-zinc-800 rounded-xl text-xs font-mono text-rose-300 overflow-x-auto whitespace-pre leading-relaxed shadow-inner">
                     {finding.evidence.request}
                   </pre>
                 </div>
@@ -230,18 +216,18 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
               {finding.evidence.response && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#475569] uppercase tracking-wider font-mono">
-                      Synthetic Server Response
+                    <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono">
+                      Server Response
                     </span>
                     <button
                       onClick={() => handleCopy(finding.evidence.response || '', 'res')}
-                      className="text-xs text-[#64748B] hover:text-[#1D4ED8] flex items-center gap-1 transition-colors"
+                      className="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1 transition-colors"
                     >
-                      {copiedSection === 'res' ? <Check size={12} className="text-[#059669]" /> : <Copy size={12} />}
+                      {copiedSection === 'res' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                       <span>{copiedSection === 'res' ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
-                  <pre className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-sky-200 overflow-x-auto whitespace-pre leading-relaxed shadow-inner">
+                  <pre className="p-3.5 bg-[#09090B] border border-zinc-800 rounded-xl text-xs font-mono text-zinc-300 overflow-x-auto whitespace-pre leading-relaxed shadow-inner">
                     {finding.evidence.response}
                   </pre>
                 </div>
@@ -249,19 +235,19 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
 
               {finding.evidence.rawSnippet && (
                 <div className="space-y-2">
-                  <span className="text-xs font-semibold text-[#475569] uppercase tracking-wider font-mono">
+                  <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono">
                     Raw Scanner Banner Output
                   </span>
-                  <pre className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-slate-200 overflow-x-auto whitespace-pre shadow-inner">
+                  <pre className="p-3.5 bg-[#09090B] border border-zinc-800 rounded-xl text-xs font-mono text-zinc-300 overflow-x-auto whitespace-pre shadow-inner">
                     {finding.evidence.rawSnippet}
                   </pre>
                 </div>
               )}
 
               {finding.evidence.matchedPattern && (
-                <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50 text-xs space-y-1">
-                  <span className="font-semibold text-amber-800">Trigger Match Pattern:</span>
-                  <code className="block font-mono text-amber-900 text-xs mt-1">
+                <div className="p-3.5 rounded-xl border border-amber-900/50 bg-amber-950/40 text-xs space-y-1">
+                  <span className="font-semibold text-amber-300 font-mono">Trigger Match Pattern:</span>
+                  <code className="block font-mono text-amber-200 text-xs mt-1">
                     {finding.evidence.matchedPattern}
                   </code>
                 </div>
@@ -271,36 +257,36 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
 
           {activeTab === 'ai' && (
             <div className="space-y-5">
-              <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/50 space-y-3">
+              <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181B] space-y-3">
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-indigo-100 text-[#4F46E5]">
+                  <div className="p-1.5 rounded-lg bg-zinc-800 text-zinc-200">
                     <Cpu size={16} />
                   </div>
-                  <span className="text-xs font-bold text-[#4F46E5] uppercase tracking-wider font-mono">
+                  <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider font-mono">
                     AI Agent Reasoning & Threat Assessment
                   </span>
                 </div>
-                <p className="text-sm text-slate-800 leading-relaxed">
+                <p className="text-sm text-zinc-300 leading-relaxed">
                   {finding.aiAnalysis.summary}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3.5 rounded-xl border border-[#D8E1EB] bg-[#EEF3F8]/50 space-y-1">
-                  <span className="text-[#64748B]">Attack Vector</span>
-                  <p className="font-mono text-[#0B1220] font-medium">{finding.aiAnalysis.attackVector}</p>
+                <div className="p-3.5 rounded-xl border border-zinc-800 bg-[#18181B] space-y-1">
+                  <span className="text-zinc-500 font-mono">Attack Vector</span>
+                  <p className="font-mono text-zinc-200 font-medium">{finding.aiAnalysis.attackVector}</p>
                 </div>
-                <div className="p-3.5 rounded-xl border border-[#D8E1EB] bg-[#EEF3F8]/50 space-y-1">
-                  <span className="text-[#64748B]">Exploitation Likelihood</span>
-                  <p className="font-mono text-[#DC2626] font-semibold">{finding.aiAnalysis.exploitLikelihood}</p>
+                <div className="p-3.5 rounded-xl border border-zinc-800 bg-[#18181B] space-y-1">
+                  <span className="text-zinc-500 font-mono">Exploitation Likelihood</span>
+                  <p className="font-mono text-red-400 font-semibold">{finding.aiAnalysis.exploitLikelihood}</p>
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl border border-[#D8E1EB] bg-white space-y-2 shadow-2xs">
-                <h5 className="text-xs font-semibold text-[#475569] uppercase tracking-wider font-mono">
+              <div className="p-4 rounded-xl border border-zinc-800 bg-[#18181B] space-y-2 shadow-xs">
+                <h5 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono">
                   Impact Assessment
                 </h5>
-                <p className="text-xs text-slate-700 leading-relaxed">
+                <p className="text-xs text-zinc-300 leading-relaxed">
                   {finding.aiAnalysis.impact}
                 </p>
               </div>
@@ -309,23 +295,23 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
 
           {activeTab === 'remediation' && (
             <div className="space-y-5">
-              <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-2">
-                <span className="text-xs font-semibold text-[#059669] uppercase tracking-wider font-mono">
+              <div className="p-4 rounded-xl border border-emerald-900/50 bg-emerald-950/30 space-y-2">
+                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider font-mono">
                   Remediation Summary
                 </span>
-                <p className="text-sm text-emerald-950 leading-relaxed">
+                <p className="text-sm text-emerald-200 leading-relaxed">
                   {finding.remediation.summary}
                 </p>
               </div>
 
               <div className="space-y-3">
-                <h5 className="text-xs font-semibold text-[#475569] uppercase tracking-wider font-mono">
+                <h5 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono">
                   Implementation Steps
                 </h5>
                 <div className="space-y-2">
                   {finding.remediation.steps.map((step, idx) => (
-                    <div key={idx} className="flex items-start gap-2.5 text-xs text-slate-800">
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-50 border border-blue-200 text-[#1D4ED8] shrink-0 font-mono text-[11px] font-bold">
+                    <div key={idx} className="flex items-start gap-2.5 text-xs text-zinc-300">
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-300 shrink-0 font-mono text-[11px] font-bold">
                         {idx + 1}
                       </span>
                       <span className="pt-0.5 leading-relaxed">{step}</span>
@@ -337,35 +323,35 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
               {finding.remediation.codeSnippet && (
                 <div className="space-y-2 pt-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#475569] uppercase tracking-wider font-mono flex items-center gap-1.5">
-                      <FileCode size={14} className="text-[#1D4ED8]" />
+                    <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <FileCode size={14} className="text-zinc-400" />
                       Recommended Patch ({finding.remediation.codeSnippet.language})
                     </span>
                     <button
                       onClick={() => handleCopy(finding.remediation.codeSnippet?.after || '', 'patch')}
-                      className="text-xs text-[#64748B] hover:text-[#1D4ED8] flex items-center gap-1 transition-colors"
+                      className="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1 transition-colors"
                     >
-                      {copiedSection === 'patch' ? <Check size={12} className="text-[#059669]" /> : <Copy size={12} />}
+                      {copiedSection === 'patch' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                       <span>{copiedSection === 'patch' ? 'Copied' : 'Copy Patch'}</span>
                     </button>
                   </div>
 
                   {finding.remediation.codeSnippet.before && (
                     <div>
-                      <span className="text-[10px] text-[#DC2626] font-mono block mb-1">− Vulnerable:</span>
-                      <pre className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs font-mono text-rose-900 overflow-x-auto whitespace-pre">
+                      <span className="text-[10px] text-red-400 font-mono block mb-1">− Vulnerable:</span>
+                      <pre className="p-2.5 bg-red-950/40 border border-red-900/60 rounded-lg text-xs font-mono text-red-300 overflow-x-auto whitespace-pre">
                         {finding.remediation.codeSnippet.before}
                       </pre>
                     </div>
                   )}
 
                   <div>
-                    <span className="text-[10px] text-[#059669] font-mono block mb-1">+ Secure Fix:</span>
-                    <pre className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-mono text-emerald-950 overflow-x-auto whitespace-pre">
+                    <span className="text-[10px] text-emerald-400 font-mono block mb-1">+ Secure Fix:</span>
+                    <pre className="p-2.5 bg-emerald-950/40 border border-emerald-900/60 rounded-lg text-xs font-mono text-emerald-300 overflow-x-auto whitespace-pre">
                       {finding.remediation.codeSnippet.after}
                     </pre>
                   </div>
-                  <p className="text-[11px] text-[#64748B] italic">
+                  <p className="text-[11px] text-zinc-500 italic">
                     {finding.remediation.codeSnippet.description}
                   </p>
                 </div>
@@ -375,13 +361,13 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[#D8E1EB] bg-slate-50/80 flex items-center justify-between">
-          <span className="text-xs text-[#64748B] font-mono">
+        <div className="p-4 border-t border-zinc-800 bg-[#121214] flex items-center justify-between">
+          <span className="text-xs text-zinc-500 font-mono">
             Sentinel AI • Normalized Finding Record
           </span>
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg bg-white border border-[#D8E1EB] text-xs font-semibold text-[#0B1220] hover:bg-[#EEF3F8] transition-colors shadow-2xs"
+            className="px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-xs font-medium text-zinc-200 hover:bg-zinc-700 hover:text-white transition-colors shadow-xs"
           >
             Close
           </button>

@@ -306,9 +306,6 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </ScanContext.Provider>
   );
-      {children}
-    </ScanContext.Provider>
-  );
 };
 
 export function useScans() {

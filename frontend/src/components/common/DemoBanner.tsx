@@ -40,11 +40,11 @@ export const DemoBanner: React.FC<DemoBannerProps> = ({
 
   return (
     <div
-      className={`bg-sentinel-surface/90 border border-amber-900/50 rounded-lg p-3.5 flex items-start gap-3 shadow-md ${className}`}
+      className={`bg-[#121214] border border-amber-900/50 rounded-2xl p-4 flex items-start gap-3 shadow-lg ${className}`}
       role="region"
       aria-label="Simulation notice"
     >
-      <div className="p-1.5 rounded bg-amber-950/70 border border-amber-800/80 text-amber-400 mt-0.5 shrink-0">
+      <div className="p-1.5 rounded-lg bg-amber-950/70 border border-amber-800/80 text-amber-400 mt-0.5 shrink-0">
         <Info size={16} aria-hidden="true" />
       </div>
       <div className="text-xs space-y-1">
@@ -52,11 +52,11 @@ export const DemoBanner: React.FC<DemoBannerProps> = ({
           <span className="font-semibold text-amber-300 uppercase tracking-wider font-mono">
             Demo & Simulation Notice
           </span>
-          <span className="px-1.5 py-0.5 text-[10px] rounded bg-sentinel-elevated border border-sentinel-border text-sentinel-muted font-mono">
+          <span className="px-1.5 py-0.5 text-[10px] rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono">
             Offline Mode
           </span>
         </div>
-        <p className="text-sentinel-muted leading-relaxed">
+        <p className="text-zinc-400 leading-relaxed">
           You are currently viewing <strong>simulated mock telemetry</strong>. No live offensive operations
           or unauthorized penetration testing against external networks are executed in this mode.
         </p>
