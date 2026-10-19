@@ -83,9 +83,28 @@ docs/           architecture.md
 runs/           gitignored runtime output (state.json, trajectory.jsonl)
 ```
 
+## Prerequisites (versions verified with this guide)
+
+| Tool | Requirement | Check |
+|---|---|---|
+| Git | any recent 2.x | `git --version` |
+| Python | **3.11+** (verified on 3.13) | `python --version` |
+| Node.js | **≥ 20.19 / 22.12+** (Vite 8 requirement; verified on v22.13) | `node --version` |
+| npm | 10.x (bundled with Node 22) | `npm --version` |
+| Docker Engine + Compose **v2** | verified with 29.x + Compose v2.39 | `docker --version && docker compose version` |
+
+Security tool binaries (nmap, httpx, nuclei, subfinder, dnsx) are **not
+needed for the recommended Docker quick start** — the backend image ships
+them pinned (httpx 1.6.0, nuclei 3.3.7, subfinder 2.16.0, dnsx 1.3.1,
+nmap 7.95). Install them on the host only for the non-Docker backend
+path (see each tool's section below).
+
 ## Quick start (Docker, recommended)
 
 Prerequisite: Docker Desktop (or any Docker Engine with Compose v2).
+On WSL2, either use Docker Desktop *or* a WSL-native Docker Engine —
+both work; just stay on one side for the whole stack (see
+Troubleshooting).
 
 ```bash
 # from the repository root
@@ -135,6 +154,43 @@ secret/expiry, admin seed credentials, CORS origins, concurrency and
 timeout limits, `AICYBERSEC_SCAN_AUTO_START` (set `0` to keep scans
 queued instead of auto-starting them), runs directory, AI provider
 settings.
+
+## Verify the application (health checks)
+
+Copy-paste these after starting the services — every command below was
+verified against this repository:
+
+```bash
+# 1. Backend is up (liveness):
+curl -s http://localhost:8000/api/v1/health
+#    -> {"success":true,"data":{"status":"ok",...}}
+
+# 2. Backend can reach PostgreSQL (readiness):
+curl -s http://localhost:8000/api/v1/health/ready
+#    -> {"success":true,"data":{"status":"ready"}}
+#    503 with error.code DATABASE_ERROR means PostgreSQL is down or the
+#    AICYBERSEC_DATABASE_URL is wrong.
+
+# 3. Migrations are applied (non-Docker path):
+alembic current          # -> 0002 (head)
+#    (the Docker backend runs `alembic upgrade head` automatically)
+
+# 4. Database container status:
+docker compose -f docker/docker-compose.yml ps   # postgres should be "healthy"
+
+# 5. Juice Shop lab target is reachable (profile lab):
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/   # -> 200
+#    first boot can take 1-2 minutes; give it the memory headroom noted
+#    in docker/docker-compose.yml (2 GB)
+
+# 6. API docs / OpenAPI:
+#    http://localhost:8000/api/v1/docs   (Swagger UI)
+#    http://localhost:8000/api/v1/openapi.json
+```
+
+Frontend: open <http://localhost:5173> — the login page should render.
+The UI calls `VITE_API_BASE_URL` (default `http://localhost:8000`,
+see `frontend/.env.example`) directly — no dev-server proxy.
 
 ## Authentication (JWT Bearer)
 
@@ -203,11 +259,16 @@ POST /api/v1/projects
   (delete is an archive, never a physical delete). You only ever see
   your own projects.
 
-Lab note: inside the compose network the `juice-shop` hostname resolves
-to the container IP. Scans may derive URL targets such as
-`http://juice-shop:3000`; the validator compares the **derived** host,
-so include the container IP as a `host` scope entry too (as above) —
-otherwise the derived target is rejected fail-closed.
+Lab note (verified behavior): inside the compose network the
+`juice-shop` hostname resolves to the container IP (it changes per
+Docker network — do not hardcode one). The scan-time scope bridge
+resolves **your authorized hostnames with its own forward-DNS lookup**
+and authorizes exactly those resolved IPs — so an nmap/httpx target
+derived from `juice-shop` is authorized automatically, while any other
+IP (scanner noise, redirect targets) stays rejected fail-closed. A
+literal `host` entry for the container IP is therefore optional; the
+`juice-shop` hostname and/or the `http://juice-shop:3000` URL entry is
+what authorizes it.
 
 ## Running a scan
 
@@ -246,24 +307,80 @@ is template-based vulnerability scanning (`danger_level=active_scan`,
 Tools run as pinned binaries with fixed argv (no shell, no arbitrary
 flags); raw tool output never enters model context or event payloads.
 
-## Demo script (~5 minutes, fully offline)
+## Manual scan test (browser workflow, ~5 minutes)
 
-1. Start the stack (Quick start) and open http://localhost:5173.
-2. Register a user — or log in as the seeded admin.
-3. Create the "Juice Shop lab" project with the 3-entry scope above.
-4. Start a `recon` scan (~15–20 s): assets appear as nmap → httpx
-   complete, and the live agent-event feed streams decisions and tool
-   results.
-5. Start a `full` scan; while httpx runs, hit **Cancel** — status moves
-   `cancelling → cancelled` within seconds.
-6. Open a completed Nuclei scan from Scan History: findings by severity,
-   per-finding evidence, tool-run list.
-7. Safety beat: a rejected decision in the agent events
-   (`decision.rejected`) shows the model proposing and the validator
-   refusing — the model proposes, safety disposes.
+Every step below matches the actual UI routes and was verified against
+the Docker stack. **The only target is the local Juice Shop container —
+nothing leaves the compose network** (the first `full` scan downloads
+nuclei templates once, which the compose file persists for later
+offline runs).
 
-Everything stays on the lab network: the only allowed target is the
-Juice Shop container.
+1. Start the stack (Quick start) and open <http://localhost:5173>.
+2. **Log in**: register your own user on `/register`, or use the seeded
+   admin — with the Docker stack that is `admin@gmail.com` /
+   `admin123` (compose env); with a local `.env` backend it is
+   `admin@aicybersec.dev` / `admin-dev-password-change-me`
+   (`.env.example` defaults). Change both in any shared environment.
+3. **New Scan** (`/new-scan`): enter `http://juice-shop:3000` as the
+   target, pick the `recon` profile, start the scan. The UI creates the
+   project for you with that URL in scope (you can also select an
+   existing project instead).
+4. **Watch the live timeline** (`/agent/:scanId`): the agent-event feed
+   streams `agent_decision` → `tool_started` → `tool_completed` entries
+   as nmap → httpx run (~15–30 s). A `recon` scan records **assets**
+   (host, service, URL) — findings come from nuclei in `web`/`full`
+   profiles.
+5. **Cancellation**: start a `full` scan and hit **Cancel** — status
+   moves `cancelling → cancelled` within seconds; a terminal scan
+   answers 409 instead.
+6. **Results**: open `/history` for past scans and `/findings` for
+   nuclei findings by severity with per-finding evidence and the
+   tool-run list. A first `full` scan takes ~2 minutes (one-time
+   template download); 0 findings is a valid clean result for the
+   pinned medium+ severity / tag filter.
+7. **Unauthorized-target rejection** (fail-closed, by design):
+   - The API rejects malformed scope before anything runs:
+     `POST /api/v1/projects` with `{"type": "domain", "value":
+     "*.example.com"}` → **422 INVALID_TARGET** (wildcards are never
+     accepted).
+   - A scan can only ever touch its project's scope plus the IPs our
+     own DNS resolves for those hostnames. Anything else a tool
+     proposes (or a redirect suggests) shows up in the timeline as a
+     rejected decision or a failed tool call — the model proposes,
+     safety disposes.
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| `/api/v1/health/ready` → 503 `DATABASE_ERROR` | PostgreSQL is down or `AICYBERSEC_DATABASE_URL` is wrong. Start it: `docker compose -f docker/docker-compose.yml up -d postgres` and wait for `healthy`. |
+| `alembic upgrade head` fails to connect | Same as above — the URL comes from `AICYBERSEC_DATABASE_URL` (or `.env`), not from `alembic.ini` (that is only a fallback). |
+| Backend logs `database unavailable; skipping admin seed` | The backend booted **without** PostgreSQL; it will not seed the admin user. Fix the DB, restart the backend. |
+| Frontend loads but API calls fail (network errors) | Backend not on `:8000`, or `VITE_API_BASE_URL` (in `frontend/.env`, from `frontend/.env.example`) points elsewhere. CORS for `localhost:5173` is pre-configured; other origins must be added to `AICYBERSEC_CORS_ORIGINS`. |
+| `npm run build` fails with "Cannot find module …" | Stale `frontend/node_modules` (dependencies changed). Run `npm install` again — verified fix after the dependency update. |
+| Tool runs fail with `executable not found: 'nmap'` (etc.) | You are running the **non-Docker** backend on a host without the security tools. Install them (see each tool section) or use the Docker backend, which ships pinned binaries. Scans stay fail-closed: missing tools are recorded as failed tool runs, never crashes. |
+| WSL2: `curl` from WSL cannot reach the backend/frontend | Services started from Windows (venv/node.exe) listen on Windows localhost — WSL cannot reach them via `127.0.0.1`. Use the Windows browser, `curl.exe`, or run the whole stack on one side. Windows reaching WSL-published ports (Docker, DB) works out of the box. |
+| Juice Shop container restarts (exit 139) or is slow to answer | Known Node heap issue below 2 GB — the compose file already sets `mem_limit: 2g`; do not lower it. First boot takes 1–2 minutes. |
+| Scan stuck in `running` for a long time | Check `GET /api/v1/scans/{id}/tool-runs`; each tool is bounded by `tool_timeout_s` (default 300 s, max 1800) and the runner kills the process group on timeout or cancel. Cancel with `POST /api/v1/scans/{id}/cancel` (202 while queued/initializing/running, 409 after terminal). |
+| Port already in use (5432 / 8000 / 5173 / 3000) | Stop the conflicting service or change the compose port mapping / `--port` for uvicorn / Vite's port. |
+| `SCAN_ALREADY_RUNNING` (409) | One active scan per project by design (DB-enforced). Wait for it to finish or cancel it. |
+
+## Stop services and clean up
+
+```bash
+# Stop everything (keeps the database volume and nuclei templates):
+docker compose -f docker/docker-compose.yml --profile lab down
+
+# Optional DEVELOPMENT reset — DESTRUCTIVE, deletes the PostgreSQL data
+# volume AND the persisted nuclei template cache. Never run this against
+# a database that holds results you care about:
+docker compose -f docker/docker-compose.yml --profile lab down -v
+
+# Dev servers: Ctrl-C in each terminal (uvicorn / npm run dev).
+```
+
+The project never deletes scan history through `DELETE /projects` —
+that endpoint only **archives** the project.
 
 ## Nmap (M1 - first real tool)
 
@@ -396,10 +513,12 @@ python -m pytest
 ```
 
 - Unit/contract tests are fully offline: no API keys, no network, no real
-  security tools.
+  security tools (724 passed without a database).
 - API/integration tests need a PostgreSQL (the compose `postgres` service
-  is enough): with it up the full suite passes (~340 tests, 1
-  environment-gated skip); without it, those tests skip automatically.
+  is enough): with it up the full suite passes (809 collected —
+  807 passed, 1 environment-gated skip, `lab_e2e` deselected by
+  default); without it, the DB-backed tests skip automatically and the
+  offline baseline still passes.
 
 ## Development workflow
 
