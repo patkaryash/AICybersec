@@ -43,7 +43,10 @@ def get_scan_for_user(session: Session, scan_id: uuid.UUID, user: User) -> Scan:
 
 
 def scan_out(scan: Scan, severity_counts: dict[str, int] | None = None) -> ScanOut:
-    """ORM row -> ScanOut. current_step is 0 in Phase 2 (no execution)."""
+    """ORM row -> ScanOut. current_step is 0 in Phase 2 (no execution).
+
+    Phase 5 Stage 1: live_probe scans also expose their immutable
+    authorization snapshot + external digest anchor (None elsewhere)."""
     per_sev = severity_counts or {}
     return ScanOut(
         id=scan.id,
@@ -69,6 +72,11 @@ def scan_out(scan: Scan, severity_counts: dict[str, int] | None = None) -> ScanO
             low=per_sev.get("low", 0),
             info=per_sev.get("info", 0),
             total=sum(per_sev.values()),
+        ),
+        live_authorization_id=getattr(scan, "live_authorization_id", None),
+        authorization_snapshot=getattr(scan, "authorization_snapshot", None),
+        authorization_snapshot_digest=getattr(
+            scan, "authorization_snapshot_digest", None
         ),
     )
 
@@ -101,6 +109,16 @@ def create_scan(session: Session, *, user: User, data: ScanCreate) -> Scan:
     error text.
     """
     project = get_project_for_user(session, data.project_id, user)
+    # Phase 5 Stage 1: live_probe is a separate authorization plane. It
+    # is created through the dedicated live service (flag gate, exact
+    # authorization binding, immutable snapshot) and NEVER through the
+    # general discovery/planning pipeline below.
+    if data.profile == "live_probe":
+        from backend.services import live_authorization_service
+
+        return live_authorization_service.create_live_scan(
+            session, user=user, data=data
+        )
     scan = Scan(
         project_id=project.id,
         status="queued",

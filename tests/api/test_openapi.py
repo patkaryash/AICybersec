@@ -30,6 +30,11 @@ FROZEN_PATHS = {
     "/api/v1/scans/{scan_id}/tool-runs",
     "/api/v1/findings/{finding_id}",
     "/api/v1/assets/{asset_id}",
+    # Phase 5 Stage 1: live website assessment authorizations.
+    "/api/v1/live-authorizations",
+    "/api/v1/live-authorizations/{authorization_id}",
+    "/api/v1/live-authorizations/{authorization_id}/suspend",
+    "/api/v1/live-authorizations/{authorization_id}/revoke",
 }
 
 PUBLIC_PATHS = {"/api/v1/health", "/api/v1/health/ready", "/api/v1/auth/register", "/api/v1/auth/login"}

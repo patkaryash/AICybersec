@@ -42,9 +42,22 @@ class BackendSettings(BaseSettings):
     max_tool_output_bytes: int = 524_288  # 512 KB
 
     # --- Scan execution (Phase 3) ---
-    # Whether POST /scans submits the scan to the ScanManager immediately.
-    # Default True (production behavior); tests set 0 for determinism.
+    # AICYBERSEC_SCAN_AUTO_START: whether POST /scans submits the scan
+    # to the ScanManager immediately. Default True (production behavior);
+    # tests set 0 for determinism.
     scan_auto_start: bool = True
+
+    # --- Phase 5: live website assessment (opt-in, DEFAULT OFF) ---
+    # Stage 1 ships authorization records + immutable snapshots ONLY.
+    # No live HTTP execution exists in Stage 1 regardless of this flag:
+    # the ScanManager hard-refuses live_probe scans (defense in depth).
+    live_probe_enabled: bool = False
+    # Policy version stamped onto authorizations and snapshots; bumping
+    # it invalidates every existing live authorization (fail closed).
+    live_probe_policy_version: str = "live-probe/v1"
+    # Maximum authorization lifetime in days (validated at creation;
+    # stricter windows are always allowed).
+    live_probe_max_authorization_days: int = 90
 
     # --- Runtime artifacts (agent state, trajectory, raw tool output) ---
     runs_dir: str = "runs"

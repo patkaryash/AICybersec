@@ -122,7 +122,16 @@ def _nmap_http_urls(observations: list[Any]) -> list[str]:
 
 
 def _httpx_urls(observations: list[Any]) -> list[str]:
-    """Final URLs from httpx observations (2xx first, then the rest)."""
+    """Service root URLs from httpx observations (2xx first, then the rest).
+
+    The requested ``url`` is preferred over ``final_url``: nuclei templates
+    probe root-relative paths against ``{{BaseURL}}``, so a redirect landing
+    page (e.g. ``http://host/login.php``) as the BaseURL would break nearly
+    every template (``/config/`` would become ``/login.php/config/``).
+    ``url`` is the authorized scanner input itself, so this also keeps the
+    proposed targets strictly inside the authorized scope instead of
+    following attacker-influenced redirect paths.
+    """
     ok_urls: list[str] = []
     other_urls: list[str] = []
     for obs in observations or []:
@@ -132,7 +141,7 @@ def _httpx_urls(observations: list[Any]) -> list[str]:
         for svc in data.get("services") or []:
             if not isinstance(svc, dict):
                 continue
-            url = svc.get("final_url") or svc.get("url")
+            url = svc.get("url") or svc.get("final_url")
             if not isinstance(url, str) or not url or url in ok_urls or url in other_urls:
                 continue
             status = svc.get("status_code")

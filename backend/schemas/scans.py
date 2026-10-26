@@ -23,11 +23,15 @@ ScanStatus = Literal[
     "cancelled",
 ]
 ScanMode = Literal["pipeline", "agent"]
-ScanProfile = Literal["recon", "web", "full"]
+# live_probe (Phase 5 Stage 1): queued live scan carrying an immutable
+# authorization snapshot; NO execution exists yet - the ScanManager
+# hard-refuses live_probe scans until the dedicated live path ships.
+ScanProfile = Literal["recon", "web", "full", "live_probe"]
 
 # Static pipeline size per profile (Phase 3 may refine progress reporting;
-# the tool sequence lengths are fixed by the profiles).
-PROFILE_TOTAL_STEPS: dict[str, int] = {"recon": 2, "web": 2, "full": 3}
+# the tool sequence lengths are fixed by the profiles). live_probe is not
+# a pipeline profile; 1 stands for its single future live stage.
+PROFILE_TOTAL_STEPS: dict[str, int] = {"recon": 2, "web": 2, "full": 3, "live_probe": 1}
 
 # queued/initializing cancel directly; running cancels cooperatively via
 # the ScanManager signal (Phase 3). Terminal states are never cancellable.
@@ -41,6 +45,9 @@ class ScanCreate(BaseModel):
     goal: str | None = Field(default=None, max_length=2000)
     tool_timeout_s: int = Field(default=300, ge=30, le=1800)
     max_steps: int | None = Field(default=None, ge=1, le=100)
+    # Phase 5 Stage 1: required for profile=live_probe, must reference an
+    # authorization bound to the SAME project; rejected otherwise.
+    live_authorization_id: uuid.UUID | None = None
 
 
 class FindingsCount(BaseModel):
@@ -70,6 +77,11 @@ class ScanOut(BaseModel):
     total_steps: int
     current_step: int = 0
     findings_count: FindingsCount = Field(default_factory=FindingsCount)
+    # Phase 5 Stage 1: populated ONLY for live_probe scans (immutable
+    # authorization snapshot + external digest anchor). None elsewhere.
+    live_authorization_id: uuid.UUID | None = None
+    authorization_snapshot: dict[str, Any] | None = None
+    authorization_snapshot_digest: str | None = None
 
 
 class DashboardOut(BaseModel):

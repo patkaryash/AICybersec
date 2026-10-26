@@ -109,6 +109,48 @@ def test_web_profile_uses_url_scope_ports_verbatim():
     assert d3.params["targets"] == ["http://172.18.0.3:3000"]
 
 
+def test_web_profile_nuclei_targets_use_service_root_not_redirect():
+    """Regression (DVWA demo): httpx follows redirects and records the
+    landing page in ``final_url`` (e.g. ``http://dvwa:80/login.php``).
+    Nuclei templates probe root-relative paths against ``{{BaseURL}}``, so
+    planning nuclei against the path-suffixed landing URL broke every
+    path template (``/config/`` became ``/login.php/config/`` -> 404 ->
+    zero findings). The service root (the authorized scanner input) must
+    be preferred; the redirect landing URL must never be the target.
+    """
+    planner = PipelinePlanner("web", SNAP)
+    httpx_obs = _obs("httpx", data={"services": [
+        {
+            "url": "http://dvwa:80",
+            "final_url": "http://dvwa:80/login.php",
+            "status_code": 200,
+        },
+    ]})
+    d = planner.decide(_state([httpx_obs]))
+    assert isinstance(d, ToolCall) and d.tool == "nuclei"
+    assert d.params["targets"] == ["http://dvwa:80"]
+
+
+def test_full_profile_keeps_2xx_url_priority():
+    """2xx services still sort first for the nuclei stage after the
+    service-root preference change."""
+    planner = PipelinePlanner("full", SNAP)
+    nmap_obs = _obs("nmap", data={"target": "demo.local", "hosts": []})
+    nmap_obs2 = _obs("nmap", data={"target": "other.local", "hosts": []})
+    httpx_obs = _obs("httpx", data={"services": [
+        {"url": "http://10.0.0.5:80", "final_url": "http://10.0.0.5:404/",
+         "status_code": 404},
+        {"url": "http://10.0.0.5:200/app", "final_url": "http://10.0.0.5:200/",
+         "status_code": 200},
+    ]})
+    d = planner.decide(_state([nmap_obs, nmap_obs2, httpx_obs]))
+    assert isinstance(d, ToolCall) and d.tool == "nuclei"
+    assert d.params["targets"] == [
+        "http://10.0.0.5:200/app",
+        "http://10.0.0.5:80",
+    ]
+
+
 def test_unknown_profile_falls_back_to_full():
     d = PipelinePlanner("stealth", SNAP).decide(_state())
     assert isinstance(d, ToolCall) and d.tool == "nmap"

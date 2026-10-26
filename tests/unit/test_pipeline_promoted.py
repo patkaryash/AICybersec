@@ -355,8 +355,9 @@ class TestPlannerHttpx:
         assert narrow.validate(
             ToolCall(tool="httpx", params={"targets": ["https://authorized.example.com/"]}), st
         ).accepted
-        # Planner may still propose the redirect URL (existing chaining);
-        # the gate underneath rejects it — propose/reject is the fail-closed pattern.
+        # The planner now proposes the authorized SERVICE ROOT (the httpx
+        # request URL), never the redirect landing URL — cross-domain
+        # redirect values never even reach the gate as planned targets.
         planner = PipelinePlanner("web", [{"type": "host", "value": "authorized.example.com"}])
         evil_obs = _obs(
             "httpx",
@@ -364,8 +365,11 @@ class TestPlannerHttpx:
         )
         d = planner.decide(_state([evil_obs]))
         assert isinstance(d, ToolCall) and d.tool == "nuclei"
-        assert "evil.example.net" in str(d.params["targets"])
-        assert not narrow.validate(d, st).accepted
+        assert d.params["targets"] == ["http://authorized.example.com"]
+        # The gate underneath still rejects explicitly proposed redirect
+        # targets — propose/reject remains the fail-closed pattern.
+        evil_call = ToolCall(tool="nuclei", params={"targets": ["https://evil.example.net/"]})
+        assert not narrow.validate(evil_call, st).accepted
 
 
 # ------------------------------------------------------- ScanManager wiring

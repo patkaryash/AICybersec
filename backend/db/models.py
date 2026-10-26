@@ -49,8 +49,13 @@ _JSON = JSON().with_variant(JSONB(), "postgresql")
 ACTIVE_SCAN_STATUSES = ("queued", "initializing", "running", "cancelling")
 SCAN_STATUSES = ACTIVE_SCAN_STATUSES + ("completed", "failed", "cancelled")
 SCAN_MODES = ("pipeline", "agent")
-SCAN_PROFILES = ("recon", "web", "full")
+SCAN_PROFILES = ("recon", "web", "full", "live_probe")
 PROJECT_STATUSES = ("active", "archived")
+# Phase 5 Stage 1: live website assessment authorizations. 'expired' and
+# 'not_yet_valid' are NOT stored statuses - the authorization record is
+# immutable; expiry/validity are evaluated from the validity window at
+# use time (see backend/services/live_authorization_service.py).
+LIVE_AUTHORIZATION_STATUSES = ("active", "suspended", "revoked")
 USER_ROLES = ("user", "admin")
 TOOL_RUN_STATUSES = ("running", "completed", "failed", "timeout", "cancelled")
 SEVERITIES = ("info", "low", "medium", "high", "critical")
@@ -133,7 +138,24 @@ class Scan(Base):
             name="ck_scans_status",
         ),
         CheckConstraint("mode IN ('pipeline', 'agent')", name="ck_scans_mode"),
-        CheckConstraint("profile IN ('recon', 'web', 'full')", name="ck_scans_profile"),
+        CheckConstraint(
+            "profile IN ('recon', 'web', 'full', 'live_probe')",
+            name="ck_scans_profile",
+        ),
+        # Hard DB-level gate: a live-probe scan ALWAYS carries its own
+        # immutable authorization snapshot + external digest anchor,
+        # separate from Project.scope / target_snapshot. Nothing else can
+        # populate live_authorization_id. Phase 5 S2-2: it must ALSO
+        # carry the immutable execution profile + its own external
+        # digest anchor (migration 0005; single upgrade-only swap).
+        CheckConstraint(
+            "profile <> 'live_probe' OR (live_authorization_id IS NOT NULL "
+            "AND authorization_snapshot IS NOT NULL "
+            "AND authorization_snapshot_digest IS NOT NULL "
+            "AND execution_profile IS NOT NULL "
+            "AND execution_profile_digest IS NOT NULL)",
+            name="ck_scans_live_probe_snapshot",
+        ),
         Index("ix_scans_project_created", "project_id", "created_at"),
         Index("ix_scans_status", "status"),
         # DB-level guarantee behind 409 SCAN_ALREADY_RUNNING: at most one
@@ -165,6 +187,36 @@ class Scan(Base):
     # Copy of project scope at scan creation - the authorization anchor.
     # Changing project scope later never affects an existing scan.
     target_snapshot: Mapped[list] = mapped_column(_JSON, nullable=False)
+    # Phase 5 Stage 1 (live_probe scans ONLY; NULL for every other
+    # profile): immutable authorization snapshot copied from the
+    # live_authorizations record at scan creation, plus an external
+    # SHA-256 digest anchor kept OUTSIDE the snapshot so silent
+    # snapshot edits are detected before execution. The live-probe path
+    # must use ONLY this snapshot - never Project.scope, never
+    # target_snapshot, never Phase 4C promotion.
+    # F2 hardening: RESTRICT (never SET NULL) - the CHECK constraint
+    # requires live_authorization_id for every live_probe scan, so an
+    # authorization referenced by any scan CANNOT be deleted silently
+    # (the SET NULL spelling violated the CHECK and could strand rows).
+    # Authorization deletion is a lifecycle decision (revoke), not a
+    # FK side effect. Audit/digest columns stay intact for a live scan.
+    live_authorization_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("live_authorizations.id", ondelete="RESTRICT")
+    )
+    authorization_snapshot: Mapped[dict | None] = mapped_column(_JSON)
+    authorization_snapshot_digest: Mapped[str | None] = mapped_column(String(64))
+    # Phase 5 Stage 2 (S2-2; live_probe scans ONLY; NULL for every other
+    # profile): immutable execution profile rendered ONCE at scan
+    # creation from the server-pinned constants
+    # (backend/services/live_probe_budgets.render_execution_profile),
+    # plus an external SHA-256 digest anchor kept OUTSIDE the payload.
+    # The digest is tamper-evidence ONLY - never authorization; the live
+    # transport must re-verify every semantic binding against live
+    # values (see live_authorization_service.verify_execution_profile)
+    # and live execution remains refused until the dedicated Stage 2
+    # prober ships.
+    execution_profile: Mapped[dict | None] = mapped_column(_JSON)
+    execution_profile_digest: Mapped[str | None] = mapped_column(String(64))
     max_steps: Mapped[int | None] = mapped_column(Integer)
     tool_timeout_s: Mapped[int] = mapped_column(
         Integer, nullable=False, default=300, server_default="300"
@@ -176,6 +228,112 @@ class Scan(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class LiveAuthorization(Base):
+    """Explicit live-assessment authorization (Phase 5 Stage 1).
+
+    One record authorizes a bounded live HTTP profile against EXACT
+    normalized HTTP/HTTPS origins of one project (no wildcards, ports
+    80/443, GET on ``/`` only, no redirect following - v1 policy).
+
+    Invariants:
+    - A record is created (activated) by an ADMIN; it is immutable
+      afterwards. Lifecycle movements are one-way: active -> suspended
+      or revoked; suspended authorizations are NOT resumable in v1 and
+      a new authorization is required.
+    - ``approved_by`` is the activating admin (audit metadata);
+      ``approved_at`` is the approval instant. An evidence reference or
+      SHA-256 evidence hash is REQUIRED and is an audit pointer only -
+      the platform does NOT claim the evidence independently proves
+      target-owner consent. Deletion semantics (F2): the project and
+      approver links are ON DELETE RESTRICT - authorization records are
+      audit artifacts and can never be silently erased by cascade; a
+      project or user referenced by an existing authorization cannot be
+      deleted (documented policy: authorization history outlives the
+      objects that produced it; archival flows must be explicit).
+    - ``origins``/``exclusions`` hold canonical origin entries
+      [{origin, scheme, host, port}]; exclusions always take
+      precedence over allow rules.
+    - ``policy_version`` is the platform live-probe policy version at
+      approval. Authorization snapshots (copied into scans) must match
+      it or they are rejected (fail closed on policy drift).
+    - ``valid_from``/``valid_until`` form the validity window; the max
+      lifetime is enforced at creation (configurable, default 90 days).
+    - Discovery is NOT authorization: this record is separate from
+      Project.scope/target_snapshot and from Phase 4C promotion; it is
+      bound to exactly one project and usable only by the live-probe
+      path (Stage 1: nothing executes).
+    """
+
+    __tablename__ = "live_authorizations"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'suspended', 'revoked')",
+            name="ck_live_authorizations_status",
+        ),
+        CheckConstraint(
+            "valid_until > valid_from", name="ck_live_authorizations_window"
+        ),
+        Index(
+            "ix_live_authorizations_project_created",
+            "project_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="active", server_default="active"
+    )
+    # Platform live-probe policy version at approval (see backend config).
+    policy_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    # Audit-only authorization evidence: an auditable reference and/or a
+    # SHA-256 hash of the authorization evidence. At least one is
+    # required by the service; neither proves consent by itself.
+    evidence_ref: Mapped[str | None] = mapped_column(Text)
+    evidence_sha256: Mapped[str | None] = mapped_column(String(64))
+    # Canonical origin entries, exclusions take precedence over allows.
+    origins: Mapped[list] = mapped_column(
+        _JSON, nullable=False, default=list, server_default=text("'[]'")
+    )
+    exclusions: Mapped[list] = mapped_column(
+        _JSON, nullable=False, default=list, server_default=text("'[]'")
+    )
+    # Permitted HTTP methods (v1: GET only; enforced with the profile).
+    methods: Mapped[list] = mapped_column(
+        _JSON, nullable=False, default=list, server_default=text("'[]'")
+    )
+    # F2 hardening: RESTRICT (never CASCADE). There is no user-deletion
+    # endpoint in the platform; if a user row is ever removed at the DB
+    # level, the deletion now FAILS instead of silently erasing the
+    # authorization audit trail (approver_id/approved_at/evidence). A
+    # provenance-preserving archival flow is deferred to an explicit,
+    # documented change (never a FK side effect).
+    approved_by: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    approved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    valid_from: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    valid_until: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

@@ -228,6 +228,17 @@ class ScanManager:
             if scan.status != "queued":
                 logger.info("scan %s no longer queued (%s); aborting", scan_id, scan.status)
                 return
+            # --- Phase 5 Stage 1: live_probe HARD REFUSAL (defense in ---
+            # depth). The API gate (feature flag) can be bypassed by
+            # direct DB rows or manual submissions; the execution path
+            # cannot. A live_probe scan NEVER reaches the registry,
+            # planner, discovery pre-stage, or any tool here. The
+            # snapshot verification runs below so tampering/invalid
+            # records surface in the failure audit; the refusal itself is
+            # unconditional in Stage 1 regardless of verification outcome.
+            if scan.profile == "live_probe":
+                self._refuse_live_probe(session, scan)
+                return
             apply_transition(scan, "initializing")
             record_event(
                 session,
@@ -378,6 +389,43 @@ class ScanManager:
 
         # --- TX4: terminal mapping + assets + ToolRun enrichment ----------
         self._finish_scan(scan_id, final, recorder)
+
+    def _refuse_live_probe(self, session, scan: Scan) -> None:
+        """Stage 1: fail a live_probe scan BEFORE any state transition,
+        tool, planner, or discovery pre-stage (no network I/O happens).
+
+        The snapshot/authorization verification result is surfaced in the
+        failure error for auditability, but Stage 1 refuses execution
+        unconditionally: even a perfectly valid authorization cannot
+        start the live path until Stage 2 ships the dedicated prober.
+        """
+        error = (
+            "Live probe execution is disabled in Stage 1: authorization "
+            "records and snapshots only."
+        )
+        try:
+            from backend.services import live_authorization_service as live_service
+
+            live_service.verify_live_scan_authorization(session, scan)
+        except ApiError as exc:
+            error = f"Live authorization rejected: {exc.message}"
+        except Exception:
+            logger.exception("live snapshot verification crashed for %s", scan.id)
+            error = "Live authorization snapshot verification failed."
+        try:
+            apply_transition(scan, "failed", error=error[:_ERROR_MAX_CHARS])
+            record_event(
+                session,
+                scan_id=scan.id,
+                event_type="scan_failed",
+                data={"status": "failed", "error": error[:_ERROR_MAX_CHARS]},
+            )
+            session.commit()
+            logger.info("live_probe scan %s refused (Stage 1): %s", scan.id, error)
+        except Exception:
+            # Raced with cancel: cancellation wins the state machine.
+            session.rollback()
+            logger.info("live_probe refusal lost the state race for %s", scan.id)
 
     def _build_per_scan_registry(self, scan_id: uuid.UUID, cancel: threading.Event, recorder: RunRecorder):
         """Per-scan tool instances bound to THIS scan's cancel event.

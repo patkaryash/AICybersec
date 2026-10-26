@@ -16,7 +16,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api import assets, auth, dashboard, events, findings, health, projects, scans
+from backend.api import (
+    assets,
+    auth,
+    dashboard,
+    events,
+    findings,
+    health,
+    live_authorizations,
+    projects,
+    scans,
+)
 from backend.core.config import get_backend_settings
 from backend.core.errors import register_exception_handlers
 
@@ -122,6 +132,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(projects.router)
     app.include_router(scans.router)
+    app.include_router(live_authorizations.router)
     app.include_router(findings.router)
     app.include_router(assets.router)
     app.include_router(events.router)
