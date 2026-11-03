@@ -63,12 +63,21 @@ services:
   # NOTE: Juice Shop's Node heap OOM-crashes (exit 139) below 2 GB - it died
   # within minutes at both 512 MB and 1 GB, even with zero scan load.
   # 2 GB is the stable lab value. Do not lower this without re-verifying.
+  # NOTE: pinned to v17.3.0. The `latest` tag moved to Node 24 which
+  # segfaults (exit 139) minutes after startup on this Docker engine,
+  # killing scans at random. v17.3.0 (Node 22) runs stably.
+  # NOTE: cpuset 0-3 pins the container to the P-cores of this laptop's
+  # 12th-gen hybrid (Alder Lake) CPU. Unpinned, Node segfaults (exit 139,
+  # OOM=false) within minutes when its threads land on E-cores - this was
+  # previously misdiagnosed as a memory problem. Do not remove the pin
+  # on this machine; on machines without hybrid CPUs it is harmless.
   juice-shop:
-    image: bkimminich/juice-shop:latest
+    image: bkimminich/juice-shop:v17.3.0
     profiles: ["lab"]
     ports:
       - "3000:3000"
     cpus: 1.0
+    cpuset: "0-3"
     mem_limit: 2g
 
 volumes:

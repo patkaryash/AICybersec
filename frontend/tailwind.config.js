@@ -7,34 +7,24 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#09090B',       // Login page dark foundation
+        background: '#09090B',       // Dark foundation
         surface: {
-          DEFAULT: '#121214',        // Login page card surface
-          elevated: '#18181B',       // Login page nested panels / inputs
+          DEFAULT: '#121214',        // Card surface
+          elevated: '#18181B',       // Nested panels / inputs
           muted: '#18181B',          // Surface muted / subtle zinc
           border: '#27272A',         // Zinc-800 border
-        },
-        sidebar: {
-          DEFAULT: '#09090B',
-          foreground: '#FAFAFA',
-          primary: '#FAFAFA',
-          'primary-foreground': '#09090B',
-          accent: '#27272A',
-          'accent-foreground': '#FAFAFA',
-          border: '#27272A',
-          ring: '#52525B',
         },
         primary: {
           DEFAULT: '#FAFAFA',        // Primary Headings
           navy: '#09090B',           // Brand Primary Dark
-          sapphire: '#FAFAFA',       // High contrast white / zinc accent
-          'sapphire-hover': '#E4E4E7',
+          sapphire: '#38BDF8',       // Accent
+          'sapphire-hover': '#0284C7',
           indigo: '#A1A1AA',         // Supporting secondary
         },
         brand: {
           navy: '#09090B',
-          sapphire: '#FAFAFA',
-          'sapphire-hover': '#E4E4E7',
+          sapphire: '#38BDF8',
+          'sapphire-hover': '#0284C7',
           indigo: '#A1A1AA',
         },
         text: {
@@ -48,7 +38,7 @@ export default {
           success: '#10B981',        // Semantic Low / Green
           medium: '#EAB308',         // Semantic Medium / Yellow
         },
-        // Sentinel compatibility tokens mapped to unified dark architecture
+        // Sentinel compatibility tokens mapped to dark architecture
         sentinel: {
           bg: '#09090B',
           surface: '#121214',
@@ -59,14 +49,14 @@ export default {
           text: '#FAFAFA',
           muted: '#A1A1AA',
           dim: '#71717A',
-          cyan: '#FAFAFA',
-          'cyan-hover': '#E4E4E7',
-          'cyan-subtle': 'rgba(255, 255, 255, 0.05)',
-          purple: '#A1A1AA',
-          'purple-hover': '#D4D4D8',
-          'purple-subtle': 'rgba(255, 255, 255, 0.05)',
+          cyan: '#38BDF8',
+          'cyan-hover': '#0284C7',
+          'cyan-subtle': 'rgba(56, 189, 248, 0.1)',
+          purple: '#A855F7',
+          'purple-hover': '#9333EA',
+          'purple-subtle': 'rgba(168, 85, 247, 0.1)',
           navy: '#09090B',
-          sapphire: '#FAFAFA',
+          sapphire: '#38BDF8',
         },
         severity: {
           critical: {
@@ -104,9 +94,6 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', 'monospace'],
-      },
-      screens: {
-        xs: '480px',
       },
       boxShadow: {
         'card': '0 1px 3px 0 rgba(11, 18, 32, 0.04), 0 1px 2px -1px rgba(11, 18, 32, 0.04)',

@@ -301,7 +301,7 @@ export const ScanProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ]
   );
 
-   return (
+  return (
     <ScanContext.Provider value={contextValue}>
       {children}
     </ScanContext.Provider>
