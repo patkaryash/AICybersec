@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Menu,
+  PanelLeft,
   ShieldPlus,
   RotateCcw,
   Check,
@@ -47,7 +48,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
     if (path === '/history') {
       return { title: 'Scan History', subtitle: 'Comprehensive archive of historical penetration testing runs' };
     }
-    return { title: 'CyberSec AI', subtitle: 'AI-Assisted Penetration Testing Platform' };
+    return { title: 'Sentinel AI', subtitle: 'Autonomous Penetration Testing Platform' };
   }, [location.pathname]);
 
   const handleReset = useCallback(async () => {
@@ -66,41 +67,43 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
   }, [logout, navigate]);
 
   return (
-    <header className="h-16 px-4 sm:px-6 bg-sentinel-surface/80 border-b border-sentinel-border flex items-center justify-between sticky top-0 z-30 backdrop-blur-md">
-      {/* Left: Mobile hamburger + Page Title */}
+    <header className="h-16 px-4 sm:px-6 bg-[#09090B]/90 border-b border-zinc-800 flex items-center justify-between sticky top-0 z-30 backdrop-blur-md">
+      {/* Left: Sidebar toggle (Mobile hamburger / Desktop PanelLeft) + Page Title */}
       <div className="flex items-center gap-3">
         <button
           onClick={onToggleSidebar}
-          className="p-2 rounded-lg text-sentinel-muted hover:text-sentinel-text hover:bg-sentinel-elevated lg:hidden transition-colors"
+          className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-600"
           aria-label="Toggle navigation menu"
+          title="Toggle Sidebar (Ctrl+B)"
         >
-          <Menu size={20} />
+          <Menu size={20} className="lg:hidden" />
+          <PanelLeft size={18} className="hidden lg:block" />
         </button>
 
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-sm sm:text-base font-bold text-sentinel-text tracking-tight">
+            <h1 className="text-sm sm:text-base font-semibold text-white tracking-tight">
               {pageInfo.title}
             </h1>
             {runningCount > 0 && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-mono bg-cyan-950/80 border border-cyan-700 text-cyan-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono bg-emerald-950/60 border border-emerald-800 text-emerald-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                 <span>{runningCount} Active</span>
               </span>
             )}
             {isDemo ? (
-              <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-950/80 border border-amber-800 text-amber-300">
+              <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono bg-zinc-800 border border-zinc-700 text-amber-400">
                 <Radio size={10} className="text-amber-400" />
                 <span>DEMO MODE</span>
               </span>
             ) : (
-              <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-950/80 border border-emerald-800 text-emerald-300">
+              <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono bg-zinc-800 border border-zinc-700 text-emerald-400">
                 <Wifi size={10} className="text-emerald-400" />
                 <span>API v1</span>
               </span>
             )}
           </div>
-          <p className="hidden md:block text-[11px] text-sentinel-muted">
+          <p className="hidden md:block text-[11px] text-zinc-400">
             {pageInfo.subtitle}
           </p>
         </div>
@@ -115,7 +118,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
               onClick={handleReset}
               disabled={resetting}
               title="Reset to default mock dataset"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-sentinel-border text-sentinel-muted hover:text-sentinel-text hover:bg-sentinel-elevated text-xs transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-800 bg-[#18181B] text-zinc-300 hover:text-white hover:bg-zinc-800 text-xs transition-colors"
             >
               {showResetSuccess ? (
                 <>
@@ -133,9 +136,9 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
             <button
               onClick={() => toggleDemoMode(false)}
               title="Switch to Real Backend API mode"
-              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-cyan-800 bg-cyan-950/40 text-cyan-300 hover:bg-cyan-900/50 text-xs font-mono transition-colors"
+              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 text-xs font-mono transition-colors"
             >
-              <Sparkles size={12} />
+              <Sparkles size={12} className="text-zinc-300" />
               <span>Use Real API</span>
             </button>
           </>
@@ -143,20 +146,20 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
           /* Real API Mode Actions */
           isAuthenticated && user && (
             <div className="flex items-center gap-2">
-              <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-sentinel-elevated/60 border border-sentinel-border text-xs font-mono">
-                <User size={13} className="text-sentinel-cyan" />
-                <span className="text-sentinel-text font-medium truncate max-w-[140px]">
+              <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#18181B] border border-zinc-800 text-xs font-mono">
+                <User size={13} className="text-zinc-400" />
+                <span className="text-zinc-200 font-medium truncate max-w-[140px]">
                   {user.display_name || user.email.split('@')[0]}
                 </span>
-                <span className="text-[10px] uppercase px-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                <span className="text-[10px] uppercase px-1 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
                   {user.role}
                 </span>
               </div>
 
               <button
                 onClick={handleLogout}
-                title="Sign out of CyberSec AI"
-                className="p-2 rounded-lg border border-sentinel-border text-sentinel-muted hover:text-rose-400 hover:bg-rose-950/20 text-xs transition-colors"
+                title="Sign out of Sentinel AI"
+                className="p-2 rounded-lg border border-zinc-800 bg-[#18181B] text-zinc-400 hover:text-red-400 hover:bg-red-950/20 text-xs transition-colors"
                 aria-label="Logout"
               >
                 <LogOut size={15} />
@@ -169,7 +172,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
         {location.pathname !== '/new-scan' && (
           <button
             onClick={() => navigate('/new-scan')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sentinel-cyan text-sentinel-bg font-semibold text-xs tracking-wide hover:bg-sentinel-cyan-hover transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-100 text-zinc-900 font-medium text-xs hover:bg-zinc-200 transition-colors shadow-sm"
           >
             <ShieldPlus size={14} />
             <span>Start Pentest</span>

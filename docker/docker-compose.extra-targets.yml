@@ -1,0 +1,84 @@
+# LOCAL TESTING ONLY - DO NOT COMMIT
+# Extra authorized lab targets for trying the platform against something
+# other than Juice Shop. Juice Shop stays the presentation target.
+#
+# Usage (from repo root):
+#   docker compose -f docker/docker-compose.yml \
+#     -f docker/docker-compose.extra-targets.yml --profile lab up -d
+#
+# Everything here is intentionally vulnerable software that must only ever
+# run inside your own Docker network. Never expose these ports beyond
+# localhost, and never point scans at Internet targets.
+
+services:
+  # Damn Vulnerable Web Application - classic PHP training target
+  # (SQLi, XSS, CSRF, file inclusion, file upload, brute force...).
+  # First-run setup: open http://localhost:4280, click
+  # "Create / Reset Database", then login admin / password.
+  dvwa:
+    image: vulnerables/web-dvwa
+    profiles: ["lab"]
+    ports:
+      - "4280:80"
+    depends_on:
+      - dvwa-db
+    # --- durable lab startup lifecycle (see local-lab/README.md) -------------
+    # Regression repaired here (2026-10-27): the upstream image starts Apache
+    # exactly once from /main.sh, and a stale /var/run/apache2/apache2.pid kept
+    # (with a PID number reused by another process) made "service apache2
+    # start" silently do nothing -> nothing listened on :80, the target was
+    # unreachable and scans reported "completed, 0 findings".
+    #   entrypoint   - clears a CONFIRMED-stale PID only, then runs /main.sh.
+    #   volume       - the initialized DVWA database used to live in the
+    #                  container layer; it now survives container re-creation.
+    #   healthcheck  - unhealthy while Apache or /config/ is broken, instead of
+    #                  a running container silently breaking detection.
+    entrypoint: ["/bin/bash", "/lab-entrypoint.sh"]
+    volumes:
+      - dvwa-mysqldata:/var/lib/mysql
+      - ./local-lab/dvwa/dvwa-entrypoint.sh:/lab-entrypoint.sh:ro
+      - ./local-lab/dvwa/dvwa-healthcheck.sh:/lab-healthcheck.sh:ro
+    healthcheck:
+      test: ["CMD", "/bin/bash", "/lab-healthcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      start_period: 30s
+      retries: 5
+    cpus: 1.0
+    mem_limit: 512m
+
+  # DVWA's database (bundled setup expects a MySQL on host "db").
+  # MariaDB keeps the legacy mysql_native_password plugin the image's
+  # old PHP client needs (mysql:8 forces caching_sha2_password).
+  # container_name "db" is REQUIRED: DVWA's config hardcodes that host.
+  dvwa-db:
+    image: mariadb:10
+    container_name: db
+    profiles: ["lab"]
+    environment:
+      MARIADB_ROOT_PASSWORD: dvwa-root
+      MARIADB_DATABASE: dvwa
+      MARIADB_USER: dvwa
+      MARIADB_PASSWORD: p@ssw0rd
+    volumes:
+      - dvwa-dbdata:/var/lib/mysql
+    cpus: 1.0
+    mem_limit: 512m
+
+  # Deliberately OLD Apache httpd 2.4.49 with CVE-2021-41773 actually
+  # exploitable (stock image denies "/" so the flaw is patched away).
+  # NOTHING else runs on this port; local network only.
+  vulnerable-httpd:
+    build: ./local-lab/httpd-vuln
+    profiles: ["lab"]
+    ports:
+      - "4282:80"
+    cpus: 0.5
+    mem_limit: 256m
+
+volumes:
+  dvwa-dbdata:
+  # DVWA application database (its own mariadb on 127.0.0.1, NOT the "db"
+  # service above). Pre-populated from the container layer during the
+  # 2026-10-27 lifecycle fix so the initialized database was preserved.
+  dvwa-mysqldata:
